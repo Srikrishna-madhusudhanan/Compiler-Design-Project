@@ -17,3 +17,8 @@ The implementation follows the classical compiler pipeline:
 - Code Generation (RISC-V)
 
 - Basic Optimizations
+
+## Meet the Team
+- Adithya Ananth (CS23B001)
+- Srikrishna Madhusudhanan (CS23B056)
+- Sudhanva Bharadwaj B M (CS23B051)
