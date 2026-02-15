@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ast.h"
+#include "y.tab.h"
 
 ASTNode* create_node(NodeType type) {
     ASTNode *node = (ASTNode*)malloc(sizeof(ASTNode));
@@ -109,6 +110,32 @@ void print_indent(int level) {
     for (int i = 0; i < level; i++) printf("  ");
 }
 
+
+const char* get_op_string(int op) {
+    switch (op) {
+        case '+': return "+";
+        case '-': return "-";
+        case '*': return "*";
+        case '/': return "/";
+        case '%': return "%";
+        case '<': return "<";
+        case '>': return ">";
+        case '=': return "=";
+        case '!': return "!";
+
+        case T_EQ:  return "==";
+        case T_NEQ: return "!=";
+        case T_LE:  return "<=";
+        case T_GE:  return ">=";
+        case T_AND: return "&&";
+        case T_OR:  return "||";
+
+        default: return "UNKNOWN_OP";
+    }
+}
+
+
+
 void print_ast(ASTNode *node, int level) {
     if (!node) return;
 
@@ -132,6 +159,12 @@ void print_ast(ASTNode *node, int level) {
                 print_ast(node->right, level + 2);
             }
             break;
+        case NODE_PARAM:
+           printf("Param: %s\n", node->str_val);
+           print_indent(level + 1);
+           printf("Type:\n");
+           print_ast(node->left, level + 2);
+           break;
         case NODE_BLOCK:
             printf("Block\n");
             print_ast(node->left, level + 1); // Statements
@@ -175,12 +208,12 @@ void print_ast(ASTNode *node, int level) {
             print_ast(node->right, level + 1); // Value
             break;
         case NODE_BIN_OP:
-            printf("BinOp: %c\n", node->int_val);
+            printf("BinOp: %s\n", get_op_string(node->int_val));
             print_ast(node->left, level + 1);
             print_ast(node->right, level + 1);
             break;
         case NODE_UN_OP:
-            printf("UnOp: %c\n", node->int_val);
+            printf("UnOp: %s\n", get_op_string(node->int_val));
             print_ast(node->left, level + 1);
             break;
         case NODE_CONST_INT:
