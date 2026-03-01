@@ -9,12 +9,16 @@ The implementation follows the classical compiler pipeline:
 - Lexical Analysis
 - Syntax Analysis (Parsing)
 - Semantic Analysis
-- **Intermediate Representation (IR)** — Three-address code (Week 4)
+- Intermediate Representation (IR)
 - Code Generation (RISC-V)
 - Basic Optimizations
 
 
-The compiler generates a simple three-address IR from the AST. After semantic analysis, run:
+The compiler generates a simple three-address IR from the AST. After semantic analysis, run the following:
+
+```bash
+make
+```
 
 ```bash
 ./parser <source.c>
