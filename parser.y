@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ast.h"
+#include "symbol_table.h"
+#include "semantic.h"
+
 
 // Declarations from Flex
 extern int yylex();
@@ -12,6 +15,9 @@ extern char *yytext;
 extern FILE *yyin;
 
 void yyerror(const char *s);
+
+#define SET_LINE(n) (n)->line_number = line_num;
+
 
 // Global Root
 ASTNode *root = NULL;
@@ -65,24 +71,30 @@ program
 
 external_declaration_list
     : external_declaration { $$ = $1; }
-    | external_declaration_list external_declaration { 
-        $$ = $1; 
-        append_node($$, $2); 
+    | external_declaration_list external_declaration {
+        $$ = $1;
+        append_node($$, $2);
     }
     ;
 
 external_declaration
     : function_definition { $$ = $1; }
     | declaration { $$ = $1; }
+    | error ';' {
+          yyerrok;
+          $$ = NULL;
+      }
     ;
 
 /* Function Definition */
 function_definition
     : type_specifier T_IDENT '(' parameter_list ')' compound_statement {
         $$ = create_func_def($1, $2, $4, $6);
+        SET_LINE($$);
     }
     | type_specifier T_IDENT '(' ')' compound_statement {
         $$ = create_func_def($1, $2, NULL, $5);
+        SET_LINE($$);
     }
     ;
 
@@ -97,6 +109,7 @@ parameter_list
 parameter_declaration
     : type_specifier T_IDENT {
         $$ = create_node(NODE_PARAM);
+        SET_LINE($$);
         $$->left = $1;
         $$->str_val = strdup($2);
     }
@@ -113,6 +126,10 @@ declaration
         }
         $$ = $2;
     }
+    | type_specifier declarator_list error {
+        yyerrok;
+        $$ = $2;
+      }
     ;
 
 declarator_list
@@ -126,19 +143,21 @@ declarator_list
 declarator
     : T_IDENT {
         $$ = create_node(NODE_VAR_DECL);
+        SET_LINE($$);
         $$->str_val = strdup($1);
     }
     | T_IDENT '=' expression {
         $$ = create_node(NODE_VAR_DECL);
+        SET_LINE($$);
         $$->str_val = strdup($1);
         $$->right = $3; // Initializer
     }
     ;
 
 type_specifier
-    : T_INT  { $$ = create_type_node(T_INT); }
-    | T_VOID { $$ = create_type_node(T_VOID); }
-    | T_CHAR { $$ = create_type_node(T_CHAR); }
+    : T_INT  { $$ = create_type_node(T_INT);  SET_LINE($$); }
+    | T_VOID { $$ = create_type_node(T_VOID); SET_LINE($$); }
+    | T_CHAR { $$ = create_type_node(T_CHAR); SET_LINE($$); }
     ;
 
 /* Statements */
@@ -151,13 +170,20 @@ statement
     ;
 
 compound_statement
-    : '{' '}' { 
-        $$ = create_node(NODE_BLOCK); 
-    }
-    | '{' block_item_list '}' { 
+    : '{' '}' {
         $$ = create_node(NODE_BLOCK);
-        $$->left = $2; 
+        SET_LINE($$);
     }
+    | '{' block_item_list '}' {
+        $$ = create_node(NODE_BLOCK);
+        SET_LINE($$);
+        $$->left = $2;
+    }
+    | '{' error '}' {
+        yyerrok;
+        $$ = create_node(NODE_BLOCK);
+        SET_LINE($$);
+      }
     ;
 
 block_item_list
@@ -174,39 +200,51 @@ block_item
     ;
 
 expression_statement
-    : ';' { $$ = create_node(NODE_EMPTY); }
+    : ';' { $$ = create_node(NODE_EMPTY);  SET_LINE($$); }
     | expression ';' { $$ = $1; }
+    | error ';' {
+          yyerrok;
+          $$ = create_node(NODE_EMPTY);
+          SET_LINE($$);
+      }
     ;
 
 selection_statement
     : T_IF '(' expression ')' statement %prec LOWER_THAN_ELSE {
         $$ = create_if_node($3, $5, NULL);
+        SET_LINE($$);
     }
     | T_IF '(' expression ')' statement T_ELSE statement {
         $$ = create_if_node($3, $5, $7);
+        SET_LINE($$);
     }
     ;
 
 iteration_statement
     : T_WHILE '(' expression ')' statement {
         $$ = create_while_node($3, $5);
+        SET_LINE($$);
     }
     | T_FOR '(' expression_statement expression_statement ')' statement {
         // For loop without increment
         // Note: expression_statement includes the node, we might want to extract children or just link them
-        $$ = create_for_node($3, $4, NULL, $6); 
+        $$ = create_for_node($3, $4, NULL, $6);
+        SET_LINE($$);
     }
     | T_FOR '(' expression_statement expression_statement expression ')' statement {
         $$ = create_for_node($3, $4, $5, $7);
+        SET_LINE($$);
     }
     ;
 
 jump_statement
     : T_RETURN ';' {
         $$ = create_node(NODE_RETURN);
+        SET_LINE($$);
     }
     | T_RETURN expression ';' {
         $$ = create_node(NODE_RETURN);
+        SET_LINE($$);
         $$->left = $2;
     }
     ;
@@ -221,6 +259,7 @@ assignment_expression
     | T_IDENT '=' assignment_expression {
         ASTNode *var = create_var_node($1);
         $$ = create_node(NODE_ASSIGN);
+        SET_LINE($$);
         $$->left = var;
         $$->right = $3;
     }
@@ -230,6 +269,7 @@ logical_or_expression
     : logical_and_expression { $$ = $1; }
     | logical_or_expression T_OR logical_and_expression {
         $$ = create_binary_node(T_OR, $1, $3);
+        SET_LINE($$);
     }
     ;
 
@@ -237,6 +277,7 @@ logical_and_expression
     : equality_expression { $$ = $1; }
     | logical_and_expression T_AND equality_expression {
         $$ = create_binary_node(T_AND, $1, $3);
+        SET_LINE($$);
     }
     ;
 
@@ -244,9 +285,11 @@ equality_expression
     : relational_expression { $$ = $1; }
     | equality_expression T_EQ relational_expression {
         $$ = create_binary_node(T_EQ, $1, $3);
+        SET_LINE($$);
     }
     | equality_expression T_NEQ relational_expression {
         $$ = create_binary_node(T_NEQ, $1, $3);
+        SET_LINE($$);
     }
     ;
 
@@ -254,15 +297,19 @@ relational_expression
     : additive_expression { $$ = $1; }
     | relational_expression '<' additive_expression {
         $$ = create_binary_node('<', $1, $3);
+        SET_LINE($$);
     }
     | relational_expression '>' additive_expression {
         $$ = create_binary_node('>', $1, $3);
+        SET_LINE($$);
     }
     | relational_expression T_LE additive_expression {
         $$ = create_binary_node(T_LE, $1, $3);
+        SET_LINE($$);
     }
     | relational_expression T_GE additive_expression {
         $$ = create_binary_node(T_GE, $1, $3);
+        SET_LINE($$);
     }
     ;
 
@@ -270,9 +317,11 @@ additive_expression
     : multiplicative_expression { $$ = $1; }
     | additive_expression '+' multiplicative_expression {
         $$ = create_binary_node('+', $1, $3);
+        SET_LINE($$);
     }
     | additive_expression '-' multiplicative_expression {
         $$ = create_binary_node('-', $1, $3);
+        SET_LINE($$);
     }
     ;
 
@@ -293,36 +342,44 @@ unary_expression
     : primary_expression { $$ = $1; }
     | '-' unary_expression {
         $$ = create_unary_node('-', $2);
+        SET_LINE($$);
     }
     | '!' unary_expression {
         $$ = create_unary_node('!', $2);
+        SET_LINE($$);
     }
     ;
 
 primary_expression
     : T_IDENT {
         $$ = create_var_node($1);
+        SET_LINE($$);
     }
     | T_NUMBER {
         $$ = create_int_node($1);
+        SET_LINE($$);
     }
     | T_CHAR_LIT {
         $$ = create_char_node($1);
+        SET_LINE($$);
     }
     | T_STRING_LIT {
         $$ = create_str_node($1);
+        SET_LINE($$);
     }
     | '(' expression ')' {
         $$ = $2;
     }
     | T_IDENT '(' argument_expression_list ')' {
         ASTNode *func = create_node(NODE_FUNC_CALL);
+        SET_LINE(func);
         func->str_val = strdup($1);
         func->left = $3; // Arguments
         $$ = func;
     }
     | T_IDENT '(' ')' {
         ASTNode *func = create_node(NODE_FUNC_CALL);
+        SET_LINE(func);
         func->str_val = strdup($1);
         $$ = func;
     }
@@ -338,8 +395,11 @@ argument_expression_list
 
 %%
 
+int parse_errors = 0;
+
 void yyerror(const char *s) {
     fprintf(stderr, "Parser Error: %s at line %d, column %d (token: %s)\n", s, line_num, col_num, yytext);
+    parse_errors++;
 }
 
 int main(int argc, char **argv) {
@@ -362,15 +422,31 @@ int main(int argc, char **argv) {
     }
 
     printf("Parsing...\n");
-    if (yyparse() == 0) {
-        printf("Parsing Successful\n");
+    int parse_result = yyparse();
+
+    if(parse_result == 0 && parse_errors == 0 && root != NULL){
+        init_symbol_table();
+        semantic_analyze(root);
+        if (semantic_errors == 0)
+        {
+          print_symbol_table();
+          printf("Semantic analysis successful.\n");
+        }
+        else{
+         printf("Semantic analysis failed with %d errors.\n", semantic_errors);
+        }
+    }
+
+    if (parse_result == 0) {
+        printf("Parsing Done with %d errors\n", parse_errors);
         printf("AST Structure:\n");
         if (root) {
             print_ast(root, 0);
+            export_ast_to_dot(root, "ast.dot");
         }
         return 0;
     } else {
         printf("Parsing Failed\n");
         return 1;
-    }
+     }
 }
