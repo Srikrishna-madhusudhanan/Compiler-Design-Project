@@ -1,14 +1,35 @@
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -g
 BISON = bison
 FLEX = flex
 
+OBJS = y.tab.o lex.yy.o ast.o symbol_table.o semantic.o
+
 all: parser
 
-parser: parser.y lexer.l ast.c ast.h
-	$(BISON) -t -d -o y.tab.c parser.y
-	$(FLEX) lexer.l
-	$(CC) $(CFLAGS) -DYYDEBUG=1 -o parser y.tab.c lex.yy.c ast.c
+parser: $(OBJS)
+        $(CC) $(CFLAGS) -DYYDEBUG=1 -o parser $(OBJS)
+
+y.tab.c y.tab.h: parser.y
+        $(BISON) -t -d -o y.tab.c parser.y
+
+lex.yy.c: lexer.l y.tab.h
+        $(FLEX) lexer.l
+
+y.tab.o: y.tab.c
+        $(CC) $(CFLAGS) -c y.tab.c
+
+lex.yy.o: lex.yy.c
+        $(CC) $(CFLAGS) -c lex.yy.c
+
+ast.o: ast.c ast.h
+        $(CC) $(CFLAGS) -c ast.c
+
+symbol_table.o: symbol_table.c symbol_table.h
+        $(CC) $(CFLAGS) -c symbol_table.c
+
+semantic.o: semantic.c semantic.h symbol_table.h ast.h
+        $(CC) $(CFLAGS) -c semantic.c
 
 clean:
-	rm -f parser y.tab.c y.tab.h lex.yy.c
+        rm -f parser *.o y.tab.c y.tab.h lex.yy.c
