@@ -1,0 +1,22 @@
+# --- Executables and Objects ---
+# These are the final results of your build process
+parser
+*.o
+
+# --- Flex Generated Files ---
+# Generated from your .l file
+lex.yy.c
+
+# --- Bison/Yacc Generated Files ---
+# Generated from your .y file (parser.y)
+*.tab.c
+*.tab.h
+y.tab.c
+y.tab.h
+*.output
+
+# --- Project Specific Artifacts ---
+# Metadata and visualization files seen in your tree
+*.dot
+ir.txt
+proposal.pdf

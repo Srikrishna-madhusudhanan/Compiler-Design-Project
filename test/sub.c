@@ -7,7 +7,7 @@ int main() {
     x = 11;
     y = 20;
 
-    result = x + y;
+    result = x - y*x;
 
     return result;
 }

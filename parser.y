@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "symbol_table.h"
 #include "semantic.h"
+#include "ir_gen.h"
 
 
 // Declarations from Flex
@@ -431,6 +432,13 @@ int main(int argc, char **argv) {
         {
           print_symbol_table();
           printf("Semantic analysis successful.\n");
+          /* Week 4: IR generation */
+          IRProgram *ir = ir_generate(root);
+          if (ir) {
+            ir_print_program(ir);
+            ir_export_to_file(ir, "ir.txt");
+            ir_free_program(ir);
+          }
         }
         else{
          printf("Semantic analysis failed with %d errors.\n", semantic_errors);
