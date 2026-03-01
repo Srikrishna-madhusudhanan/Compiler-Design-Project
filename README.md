@@ -13,7 +13,6 @@ The implementation follows the classical compiler pipeline:
 - Code Generation (RISC-V)
 - Basic Optimizations
 
-### Week 4: IR (Three-Address Code)
 
 The compiler generates a simple three-address IR from the AST. After semantic analysis, run:
 
