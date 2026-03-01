@@ -1,3 +1,5 @@
+#include "symbol_table.h"
+
 #ifndef AST_H
 #define AST_H
 
@@ -24,13 +26,14 @@ typedef enum {
 
 typedef struct ASTNode {
     NodeType type;
-    
+    DataType data_type;   // semantic type (int, char, void)
+    int line_number;      // source line number
     // For operators (+, -, *, etc.) and types (int, void)
-    int int_val;      
-    
+    int int_val;
+
     // For identifiers and string literals
-    char *str_val;    
-    
+    char *str_val;
+
     // Children pointers
     struct ASTNode *left;
     struct ASTNode *right;
@@ -38,10 +41,16 @@ typedef struct ASTNode {
     struct ASTNode *body;  // Specific for control flow
     struct ASTNode *init;  // For loops
     struct ASTNode *incr;  // For loops
-    
+    struct ASTNode *params; // for function parameters
+
     // For linked lists (e.g., list of statements, list of args)
-    struct ASTNode *next; 
+    struct ASTNode *next;
 } ASTNode;
+
+
+void export_ast_to_dot(ASTNode *root, const char *filename);
+
+
 
 // Node Creation Functions
 ASTNode* create_node(NodeType type);
