@@ -1,10 +1,10 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk  # pyright: ignore[reportMissingImports]
 import subprocess
 import os
 
-COMPILER_EXECUTABLE = "./parser"
+COMPILER_EXECUTABLE = "./build/parser"
 
 class MiniCompilerGUI:
 
@@ -180,6 +180,9 @@ class MiniCompilerGUI:
             stderr=subprocess.PIPE,
             text=True
         )
+
+        #remove temp file after compilation
+        os.remove(temp_file)
 
         self.output_text.insert(tk.END, result.stdout)
 
