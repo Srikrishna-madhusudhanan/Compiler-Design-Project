@@ -83,7 +83,7 @@ ASTNode* create_case_node(ASTNode *expr, ASTNode *body);
 ASTNode* create_break_node(void);
 
 // List manipulation
-void append_node(ASTNode *head, ASTNode *new_node);
+ASTNode* append_node(ASTNode *head, ASTNode *new_node);
 
 // Visualization
 void print_ast(ASTNode *node, int level);

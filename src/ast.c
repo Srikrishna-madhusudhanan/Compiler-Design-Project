@@ -306,16 +306,19 @@ ASTNode* create_break_node(void) {
     return create_node(NODE_BREAK);
 }
 
-void append_node(ASTNode *head, ASTNode *new_node) {
-    if (!head || !new_node) return;
+ASTNode* append_node(ASTNode *head, ASTNode *new_node) {
+    if (!new_node) return head;
 
-    new_node->next = NULL;
+    //new_node->next = NULL;
 
+    if(!head) return new_node;
+    
     ASTNode *temp = head;
     while (temp->next) {
         temp = temp->next;
     }
     temp->next = new_node;
+    return head;
 }
 
 // Helper to print indentation

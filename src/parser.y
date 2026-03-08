@@ -54,7 +54,7 @@ ASTNode *root = NULL;
 /* Types for non-terminals */
 %type <node> program external_declaration_list external_declaration
 %type <node> function_definition parameter_list parameter_declaration
-%type <node> declaration declarator_list declarator pointer direct_declarator type_specifier
+%type <node> declaration declarator_list init_declarator declarator pointer direct_declarator type_specifier
 %type <node> statement compound_statement block_item_list block_item
 %type <node> expression_statement selection_statement iteration_statement jump_statement
 %type <node> switch_statement switch_clause_list switch_clause
@@ -75,8 +75,7 @@ program
 external_declaration_list
     : external_declaration { $$ = $1; }
     | external_declaration_list external_declaration {
-        $$ = $1;
-        append_node($$, $2);
+        $$ = append_node($1, $2);
     }
     ;
 
@@ -104,8 +103,7 @@ function_definition
 parameter_list
     : parameter_declaration { $$ = $1; }
     | parameter_list ',' parameter_declaration {
-        $$ = $1;
-        append_node($$, $3);
+        $$ = append_node($1, $3);
     }
     ;
 
@@ -128,8 +126,8 @@ declaration
     : type_specifier declarator_list ';' {
         // Distribute type to all declarators
         ASTNode *temp = $2;
-        while(temp) {
-            temp->left = $1; // Set type
+        while(temp) { 
+            temp->left = create_type_node($1->int_val); // Set type
             temp = temp->next;
         }
         $$ = $2;
@@ -141,10 +139,20 @@ declaration
     ;
 
 declarator_list
+    : init_declarator { $$ = $1; }
+    | declarator_list ',' init_declarator {
+        if ($3)
+          $$ = append_node($1, $3);
+        else
+          $$ = $1;
+    }
+    ;
+
+init_declarator
     : declarator { $$ = $1; }
-    | declarator_list ',' declarator {
+    | declarator '=' expression {
+        $1->right = $3;   /* attach initializer */
         $$ = $1;
-        append_node($$, $3);
     }
     ;
 
@@ -177,6 +185,7 @@ direct_declarator
         $$->str_val = strdup($1);
         $$->array_dim_count = 0;
         $$->array_dim_exprs = NULL;
+        $$->next = NULL;
     }
     | direct_declarator '[' expression ']' {
         $$ = $1;
@@ -228,8 +237,7 @@ compound_statement
 block_item_list
     : block_item { $$ = $1; }
     | block_item_list block_item {
-        $$ = $1;
-        append_node($$, $2);
+        $$ = append_node($1, $2);
     }
     ;
 
@@ -302,8 +310,7 @@ switch_statement
 switch_clause_list
     : switch_clause { $$ = $1; }
     | switch_clause_list switch_clause {
-        $$ = $1;
-        append_node($$, $2);
+        $$ = append_node($1, $2);
     }
     ;
 
@@ -326,8 +333,7 @@ statement_list_opt
 statement_list
     : statement { $$ = $1; }
     | statement_list statement {
-        $$ = $1;
-        append_node($$, $2);
+        $$ = append_node($1, $2);
     }
     ;
 
@@ -414,12 +420,15 @@ multiplicative_expression
     : unary_expression { $$ = $1; }
     | multiplicative_expression '*' unary_expression {
         $$ = create_binary_node('*', $1, $3);
+        SET_LINE($$);
     }
     | multiplicative_expression '/' unary_expression {
         $$ = create_binary_node('/', $1, $3);
+        SET_LINE($$);
     }
     | multiplicative_expression '%' unary_expression {
         $$ = create_binary_node('%', $1, $3);
+        SET_LINE($$);
     }
     ;
 
@@ -486,8 +495,7 @@ primary_expression
 argument_expression_list
     : expression { $$ = $1; }
     | argument_expression_list ',' expression {
-        $$ = $1;
-        append_node($$, $3);
+        $$ = append_node($1, $3);
     }
     ;
 
