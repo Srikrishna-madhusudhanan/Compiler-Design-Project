@@ -21,7 +21,7 @@ make
 ```
 
 ```bash
-./parser <source.c>
+./build/parser test/<source.c>
 ```
 
 IR is printed to stdout and exported to `ir.txt`. Run validation:
