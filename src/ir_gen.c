@@ -798,6 +798,13 @@ IRProgram* ir_generate(ASTNode *ast_root) {
     for (ASTNode *n = ast_root; n; n = n->next) {
         if (n->type == NODE_FUNC_DEF)
             gen_func(n, prog);
+        else if (n->type == NODE_STRUCT_DEF) {
+            for (ASTNode *m = n->body; m; m = m->next) {
+                if (m && m->type == NODE_FUNC_DEF) {
+                    gen_func(m, prog);
+                }
+            }
+        }
         else if (n->type == NODE_VAR_DECL) {
             /* Global var init: emit to global_instrs if needed */
             if (n->right) {

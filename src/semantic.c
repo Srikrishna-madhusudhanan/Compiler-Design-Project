@@ -218,14 +218,13 @@ void analyze_struct_def(ASTNode *node) {
                 m->next_member = sym->members;
                 sym->members = m;
             }
-            member->str_val = orig_name; // Restore AST
 
             if (func) {
                 func->unmangled_name = strdup(orig_name);
                 func->access_modifier = current_access;
-                if (member->is_virtual) {
+                Symbol *existing_v = find_virtual_method(sym, orig_name);
+                if (member->is_virtual || existing_v) {
                     func->is_virtual = 1;
-                    Symbol *existing_v = find_virtual_method(sym, orig_name);
                     if (existing_v) {
                         func->vtable_index = existing_v->vtable_index;
                         replace_virtual_method(sym, func);
@@ -235,6 +234,7 @@ void analyze_struct_def(ASTNode *node) {
                     }
                 }
             }
+            free(orig_name);
             continue;
         }
 

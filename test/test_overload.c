@@ -1,5 +1,10 @@
 class Calculator {
+    private:
+    int x;
     public:
+    Calculator(){
+        x = 8;
+    }
     int add(int x, int y) {
         return x + y;
     }
