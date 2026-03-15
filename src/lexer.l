@@ -36,6 +36,11 @@ const char *token_name(int token) {
         case T_BREAK:   return "T_BREAK";
         case T_CONTINUE:return "T_CONTINUE";
         case T_STRUCT:  return "T_STRUCT";
+        case T_VIRTUAL: return "T_VIRTUAL";
+        case T_CLASS:   return "T_CLASS";
+        case T_PUBLIC:  return "T_PUBLIC";
+        case T_PRIVATE: return "T_PRIVATE";
+        case T_COLON:   return "T_COLON";
         case T_ARROW:   return "T_ARROW";
 
         case T_IDENT:   return "T_IDENT";
@@ -86,6 +91,11 @@ STRING_LITERAL \"([^\\\n]|\\[nt'\"\\])*\"
 "void"      { SAVE_POS(); ADVANCE(); return T_VOID; }
 "char"      { SAVE_POS(); ADVANCE(); return T_CHAR; }  // added 30/1/2026
 "struct"    { SAVE_POS(); ADVANCE(); return T_STRUCT; }
+"virtual"   { SAVE_POS(); ADVANCE(); return T_VIRTUAL; }
+"class"     { SAVE_POS(); ADVANCE(); return T_CLASS; }
+"public"    { SAVE_POS(); ADVANCE(); return T_PUBLIC; }
+"private"   { SAVE_POS(); ADVANCE(); return T_PRIVATE; }
+":"         { SAVE_POS(); ADVANCE(); return T_COLON; }
 "if"        { SAVE_POS(); ADVANCE(); return T_IF; }
 "else"      { SAVE_POS(); ADVANCE(); return T_ELSE; }
 "while"     { SAVE_POS(); ADVANCE(); return T_WHILE; }
@@ -126,7 +136,7 @@ STRING_LITERAL \"([^\\\n]|\\[nt'\"\\])*\"
 ")"         { SAVE_POS(); ADVANCE(); return ')'; }
 "{"         { SAVE_POS(); ADVANCE(); return '{'; }
 "}"         { SAVE_POS(); ADVANCE(); return '}'; }
-":"         { SAVE_POS(); ADVANCE(); return ':'; }
+ /* ":"         { SAVE_POS(); ADVANCE(); return ':'; } removed for T_COLON */
 "["         { SAVE_POS(); ADVANCE(); return '['; }
 "]"         { SAVE_POS(); ADVANCE(); return ']'; }
 

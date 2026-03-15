@@ -72,12 +72,11 @@ Symbol *create_symbol(char *name, DataType type,
 
     Symbol *sym = malloc(sizeof(Symbol));
     sym->name = strdup(name);
+    sym->unmangled_name = NULL;
     sym->type = type;
     sym->kind = kind;
     sym->line_number = line;
     sym->scope_level = current_scope->level;
-    sym->offset = 0;
-    sym->local_vars_size = 0;
 
     /* Default: not an array symbol */
     sym->is_array = 0;
@@ -87,7 +86,8 @@ Symbol *create_symbol(char *name, DataType type,
     sym->struct_def = NULL;
     sym->struct_size = 0;
     sym->members = NULL;
-    sym->offset = 0;
+    sym->struct_offset = 0;
+    sym->frame_offset = 0;
 
     /* New fields */
     sym->pointer_level = 0;
@@ -99,6 +99,8 @@ Symbol *create_symbol(char *name, DataType type,
     sym->param_types = NULL;
     sym->param_is_array = NULL;
     sym->next = NULL;
+    sym->next_member = NULL;
+    sym->vtable_index = -1;
 
     return sym;
 }
@@ -185,9 +187,7 @@ void print_scope(Scope *scope) {
             data_type_to_string(sym->type),
             symbol_kind_to_string(sym->kind),
             sym->line_number,
-            sym->scope_level,
-            sym->offset);
-            if (sym->kind == SYM_FUNCTION) printf(" | L_Size: %d", sym->local_vars_size);
+            sym->scope_level);
             if (sym->pointer_level > 0) printf(" | Ptr: %d", sym->pointer_level);
             if (sym->array_dim_count > 0) {
                 printf(" | Dims: [");
@@ -203,8 +203,8 @@ void print_scope(Scope *scope) {
             }
             if (sym->kind == SYM_STRUCT && sym->members) {
                 printf(" | Members:");
-                for (Symbol *m = sym->members; m; m = m->next) {
-                    printf(" %s(offset=%d)", m->name, m->offset);
+                for (Symbol *m = sym->members; m; m = m->next_member) {
+                    printf(" %s(offset=%d)", m->name, m->struct_offset);
                 }
             }
             printf("\n");

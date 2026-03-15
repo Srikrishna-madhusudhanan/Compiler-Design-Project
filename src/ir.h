@@ -23,7 +23,8 @@ typedef enum {
     IR_GOTO,        /* goto L1 */
     IR_IF,          /* if x relop y goto L1 */
     IR_LOAD,        /* t := load base, idx, scale */
-    IR_STORE        /* store base, idx, scale := val */
+    IR_STORE,       /* store base, idx, scale := val */
+    IR_CALL_INDIRECT /* x := call *fn, n */
 } IROpKind;
 
 /* Relational operators for IR_IF */
@@ -115,6 +116,7 @@ IRInstr* ir_make_unop(char *dst, IROperand src, int op, int line);
 IRInstr* ir_make_param(IROperand op, int line);
 IRInstr* ir_make_call(char *dst, char *fn, int nargs, int line);
 IRInstr* ir_make_call_void(char *fn, int nargs, int line);
+IRInstr* ir_make_call_indirect(char *dst, IROperand fn_ptr, int nargs, int line);
 IRInstr* ir_make_return_val(IROperand op, int line);
 IRInstr* ir_make_return(int line);
 IRInstr* ir_make_label(char *label, int line);

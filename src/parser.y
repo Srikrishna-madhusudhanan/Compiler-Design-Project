@@ -7,6 +7,27 @@
 #include "semantic.h"
 #include "ir_gen.h"
 
+void print_vtables() {
+    Scope *global = current_scope;
+    while (global && global->level > 0) global = global->parent;
+    if (!global) return;
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        Symbol *sym = global->table[i];
+        while (sym) {
+            if (sym->kind == SYM_STRUCT && sym->virtual_methods) {
+                printf("vtable_%s:\n", sym->name);
+                Symbol *m = sym->virtual_methods;
+                int idx = 0;
+                while (m) {
+                    printf("  .word %s\n", m->name);
+                    idx++;
+                    m = m->next_member;
+                }
+            }
+            sym = sym->next;
+        }
+    }
+}
 
 // Declarations from Flex
 extern int yylex();
@@ -31,7 +52,7 @@ ASTNode *root = NULL;
 }
 
 /* Tokens */
-%token <intval> T_INT T_VOID T_CHAR T_STRUCT
+%token <intval> T_INT T_VOID T_CHAR T_STRUCT T_VIRTUAL T_CLASS T_PUBLIC T_PRIVATE T_COLON
 %token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE
 %token <str>    T_IDENT T_STRING_LIT
 %token <intval> T_NUMBER T_CHAR_LIT
@@ -64,7 +85,7 @@ ASTNode *root = NULL;
 %type <node> equality_expression relational_expression additive_expression
 %type <node> multiplicative_expression unary_expression postfix_expression primary_expression
 %type <node> argument_expression_list
-%type <node> struct_specifier struct_declaration_list
+%type <node> struct_specifier struct_declaration_list struct_member class_specifier
 
 %%
 
@@ -172,6 +193,10 @@ declaration
         /* Standalone struct definition (no variable declared) */
         $$ = $1;
     }
+    | class_specifier ';' {
+        /* Standalone class definition (no variable declared) */
+        $$ = $1;
+    }
     ;
 
 declarator_list
@@ -242,6 +267,7 @@ type_specifier
     | T_VOID { $$ = create_type_node(T_VOID); SET_LINE($$); }
     | T_CHAR { $$ = create_type_node(T_CHAR); SET_LINE($$); }
     | struct_specifier { $$ = $1; }
+    | class_specifier { $$ = $1; }
     ;
 
 struct_specifier
@@ -262,9 +288,56 @@ struct_specifier
     }
     ;
 
+class_specifier
+    : T_CLASS T_IDENT '{' struct_declaration_list '}' {
+        ASTNode *node = create_node(NODE_STRUCT_DEF);
+        SET_LINE(node);
+        node->str_val = strdup($2);
+        node->body = $4;
+        node->is_class = 1;
+        $$ = node;
+    }
+    | T_CLASS T_IDENT T_COLON T_IDENT '{' struct_declaration_list '}' {
+        ASTNode *node = create_node(NODE_STRUCT_DEF);
+        SET_LINE(node);
+        node->str_val = strdup($2);
+        node->base_class_name = strdup($4);
+        node->body = $6;
+        node->is_class = 1;
+        $$ = node;
+    }
+    | T_CLASS T_IDENT {
+        ASTNode *node = create_type_node(T_CLASS);
+        node->str_val = strdup($2);
+        $$ = node;
+    }
+    ;
+
 struct_declaration_list
+    : struct_member { $$ = $1; }
+    | struct_declaration_list struct_member { $$ = append_node($1, $2); }
+    ;
+
+struct_member
     : declaration { $$ = $1; }
-    | struct_declaration_list declaration { $$ = append_node($1, $2); }
+    | T_VIRTUAL function_definition {
+        /* Mark the function as virtual */
+        $2->is_virtual = 1;
+        $$ = $2;
+    }
+    | function_definition { $$ = $1; }
+    | T_PUBLIC T_COLON {
+        ASTNode *node = create_node(NODE_ACCESS_SPEC);
+        SET_LINE(node);
+        node->access_modifier = 0; /* public */
+        $$ = node;
+    }
+    | T_PRIVATE T_COLON {
+        ASTNode *node = create_node(NODE_ACCESS_SPEC);
+        SET_LINE(node);
+        node->access_modifier = 1; /* private */
+        $$ = node;
+    }
     ;
 
 /* Statements */
@@ -521,16 +594,18 @@ postfix_expression
     | postfix_expression '(' argument_expression_list ')' {
         ASTNode *func = create_node(NODE_FUNC_CALL);
         SET_LINE(func);
-        /* For now, require base be a simple var name */
+        func->left = $1; /* Callee */
+        func->right = $3; /* Arguments */
         if ($1 && $1->type == NODE_VAR) {
             func->str_val = strdup($1->str_val);
         }
-        func->left = $3; /* Arguments */
         $$ = func;
     }
     | postfix_expression '(' ')' {
         ASTNode *func = create_node(NODE_FUNC_CALL);
         SET_LINE(func);
+        func->left = $1; /* Callee */
+        func->right = NULL;
         if ($1 && $1->type == NODE_VAR) {
             func->str_val = strdup($1->str_val);
         }
@@ -629,6 +704,7 @@ int main(int argc, char **argv) {
           IRProgram *ir = ir_generate(root);
           if (ir) {
             ir_print_program(ir);
+            print_vtables();
             ir_export_to_file(ir, "ir.txt");
             ir_free_program(ir);
           }

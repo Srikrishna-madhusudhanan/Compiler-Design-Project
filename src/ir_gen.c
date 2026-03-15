@@ -236,7 +236,7 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
             /* member access: compute base pointer/address and load field */
             IROperand base = gen_expr(node->left, list);
             int offset = node->member_offset;
-            int scale = get_type_size(node->data_type);
+            int scale = get_type_size(node->data_type, node->pointer_level, node->struct_def);
             if (scale <= 0) scale = 1;
             int idx = offset / scale;
             IROperand index = ir_op_const(idx);
@@ -307,7 +307,7 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
                 // dereference: load from pointer
                 IROperand base = gen_expr(node->left, list);
                 char *t = ir_new_temp();
-                int scale = get_type_size(node->type);
+                int scale = get_type_size(node->data_type, node->pointer_level, node->struct_def);
                 ir_append(list, ir_make_load(t, base, ir_op_const(0), scale, line));
                 if (base.name) free(base.name);
                 IROperand res = ir_op_name(t);
@@ -366,9 +366,8 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
                 ASTNode *mem = node->left;
                 IROperand base = gen_expr(mem->left, list);
                 int offset = mem->member_offset;
-                int scale = get_type_size(mem->data_type);
-                if (scale <= 0) scale = 1;
-                int idx = offset / scale;
+                int scale = get_type_size(mem->data_type, mem->pointer_level, mem->struct_def);
+                int idx = offset / (scale > 0 ? scale : 1);
                 IROperand index_op = ir_op_const(idx);
                 ir_append(list, ir_make_store(base, index_op, scale, val, line));
                 if (base.name) free(base.name);
@@ -377,7 +376,7 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
             } else if (node->left->type == NODE_UN_OP && node->left->int_val == '*') {
                 /* Pointer dereference assignment: *p = val */
                 IROperand base = gen_expr(node->left->left, list);
-                int scale = get_type_size(node->left->type);
+                int scale = get_type_size(node->left->data_type, node->left->pointer_level, node->left->struct_def);
                 ir_append(list, ir_make_store(base, ir_op_const(0), scale, val, line));
                 if (base.name) free(base.name);
                 if (val.name) free(val.name);
@@ -391,25 +390,93 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
 
         case NODE_FUNC_CALL: {
             int nargs = 0;
-            ASTNode *arg = node->left;
+            ASTNode *arg = node->right;  // args are in right
+            char *obj_name = NULL;
+            if (node->left->type == NODE_MEMBER_ACCESS && node->is_virtual_call) {
+                if (arg && arg->type == NODE_VAR) {
+                    obj_name = strdup(arg->str_val);
+                } else if (arg && arg->type == NODE_UN_OP && arg->int_val == '*') { 
+                    /* if it's *d */
+                    if (arg->left && arg->left->type == NODE_VAR) {
+                        obj_name = strdup(arg->left->str_val);
+                    }
+                }
+            }
             while (arg) {
                 IROperand a = gen_expr(arg, list);
+                if (nargs == 0 && !obj_name && a.name) obj_name = strdup(a.name);
                 ir_append(list, ir_make_param(a, line));
                 if (a.name) free(a.name);
                 nargs++;
                 arg = arg->next;
             }
-            /* Return type from semantic analysis */
-            int is_void = (node->data_type == TYPE_VOID);
-            if (is_void) {
-                ir_append(list, ir_make_call_void(node->str_val, nargs, line));
+            /* Check if method call */
+            if (node->left->type == NODE_MEMBER_ACCESS) {
+                /* Method call */
+                if (node->is_virtual_call) {
+                    /* Virtual call */
+                    IROperand obj = ir_op_name(obj_name ? obj_name : "obj");
+                    char *vtable_temp = ir_new_temp();
+                    ir_append(list, ir_make_load(vtable_temp, obj, ir_op_const(0), 4, line));
+                    int idx = node->func_sym ? node->func_sym->vtable_index : 0;
+                    char *func_temp = ir_new_temp();
+                    ir_append(list, ir_make_load(func_temp, ir_op_name(vtable_temp), ir_op_const(idx), 4, line));
+                    int is_void = (node->data_type == TYPE_VOID);
+                    if (is_void) {
+                        ir_append(list, (IRInstr*)ir_make_call_indirect(NULL, ir_op_name(func_temp), nargs, line));
+                    } else {
+                        char *t = ir_new_temp();
+                        ir_append(list, ir_make_call_indirect(t, ir_op_name(func_temp), nargs, line));
+                        IROperand res = ir_op_name(t);
+                        free(t);
+                        free(vtable_temp);
+                        free(func_temp);
+                        if (obj.name) free(obj.name);
+                        if (obj_name) free(obj_name);
+                        return res;
+                    }
+                    free(vtable_temp);
+                    free(func_temp);
+                    if (obj.name) free(obj.name);
+                    if (obj_name) free(obj_name);
+                    return ir_op_const(0);
+                } else {
+                    /* Non-virtual method, direct call */
+                    /* For now, assume the member is the function name */
+                    char *fn = node->func_sym ? node->func_sym->name : node->left->str_val;
+                    int is_void = (node->data_type == TYPE_VOID);
+                    if (is_void) {
+                        ir_append(list, ir_make_call_void(fn, nargs, line));
+                        if (obj_name) free(obj_name);
+                        return ir_op_const(0);
+                    }
+                    char *t = ir_new_temp();
+                    ir_append(list, ir_make_call(t, fn, nargs, line));
+                    IROperand res = ir_op_name(t);
+                    free(t);
+                    if (obj_name) free(obj_name);
+                    return res;
+                }
+            } else if (node->left->type == NODE_VAR) {
+                /* Direct function call */
+                char *fn = node->left->str_val;
+                int is_void = (node->data_type == TYPE_VOID);
+                if (is_void) {
+                    ir_append(list, ir_make_call_void(fn, nargs, line));
+                    if (obj_name) free(obj_name);
+                    return ir_op_const(0);
+                }
+                char *t = ir_new_temp();
+                ir_append(list, ir_make_call(t, fn, nargs, line));
+                IROperand res = ir_op_name(t);
+                free(t);
+                if (obj_name) free(obj_name);
+                return res;
+            } else {
+                /* Other func expr, not supported */
+                if (obj_name) free(obj_name);
                 return ir_op_const(0);
             }
-            char *t = ir_new_temp();
-            ir_append(list, ir_make_call(t, node->str_val, nargs, line));
-            IROperand res = ir_op_name(t);
-            free(t);
-            return res;
         }
 
         default:
@@ -607,13 +674,24 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
             (void)gen_expr(node, list);
             break;
 
-        case NODE_VAR_DECL:
+        case NODE_VAR_DECL: {
+            Symbol *sym = lookup(node->str_val);
+            if (sym && sym->struct_def && sym->struct_def->virtual_methods) {
+                char vtable_name[256];
+                snprintf(vtable_name, sizeof(vtable_name), "vtable_%s", sym->struct_def->name);
+                IROperand vtable_op = ir_op_name(vtable_name);
+                IROperand base = ir_op_name(node->str_val);
+                ir_append(list, ir_make_store(base, ir_op_const(0), 4, vtable_op, line));
+                if (vtable_op.name) free(vtable_op.name);
+                if (base.name) free(base.name);
+            }
             if (node->right) {
                 IROperand init = gen_expr(node->right, list);
                 ir_append(list, ir_make_assign(node->str_val, init, line));
                 if (init.name) free(init.name);
             }
             break;
+        }
 
         default:
             /* Expression statement (e.g. foo(); x+1;) */

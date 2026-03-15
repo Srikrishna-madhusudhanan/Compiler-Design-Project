@@ -37,6 +37,6 @@ int analyze_for(ASTNode* node);
 
 int analyze_switch(ASTNode *node);
 
-int get_type_size(DataType t);
+int get_type_size(DataType t, int pointer_level, Symbol *struct_def);
 
 #endif

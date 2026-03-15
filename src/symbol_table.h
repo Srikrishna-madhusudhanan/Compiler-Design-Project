@@ -22,6 +22,7 @@ typedef enum {
 
 typedef struct Symbol {
     char *name;
+    char *unmangled_name;
     DataType type;
     SymbolKind kind;
 
@@ -32,15 +33,29 @@ typedef struct Symbol {
     int local_vars_size; // For functions: total size of local variables
 
 
+    int frame_offset;    // Offset relative to FP (s0)
+    int local_vars_size; // For functions: total size of local variables
+
     /* For struct types: points to struct definition symbol (SYM_STRUCT) */
     struct Symbol *struct_def;
     /* Size in bytes for struct types */
     int struct_size;
     /* List of members for struct definitions */
     struct Symbol *members;
+    /* List of virtual methods for struct definitions */
+    struct Symbol *virtual_methods;
+    /* Size of vtable */
+    int vtable_size;
+    /* Is class (vs struct) */
+    int is_class;
+    /* Base class symbol for inheritance */
+    struct Symbol *base_class;
+
+    /* Access modifier (0=public, 1=private, 2=protected) */
+    int access_modifier;
 
     /* For member symbols (fields): offset within the struct */
-    int offset;
+    int struct_offset;
 
     /* Array information (for variables/parameters) */
     /* is_array: 1 if this symbol represents an array object */
@@ -67,7 +82,13 @@ typedef struct Symbol {
      */
     int *param_is_array;
 
-    struct Symbol *next;   // hash chaining
+    // For functions: virtual flag
+    int is_virtual;
+    // For virtual functions: index in vtable
+    int vtable_index;
+
+    struct Symbol *next;          // hash chaining
+    struct Symbol *next_member;   // linked list for struct/class members
 } Symbol;
 
 typedef struct Scope {

@@ -33,6 +33,7 @@ const char* node_type_to_string(NodeType type) {
         case NODE_INDEX: return "INDEX";
         case NODE_MEMBER_ACCESS: return "MEMBER_ACCESS";
         case NODE_STRUCT_DEF: return "STRUCT_DEF";
+        case NODE_ACCESS_SPEC: return "ACCESS_SPEC";
         default: return "UNKNOWN";
     }
 }
@@ -157,7 +158,18 @@ ASTNode* create_node(NodeType type) {
     node->pointer_level = 0;
     node->array_dim_count = 0;
     node->array_dim_exprs = NULL;
+    node->pointer_level = 0;
+    node->array_dim_count = 0;
+    node->array_dim_exprs = NULL;
     node->member_offset = 0;
+    node->access_modifier = 0;
+    node->base_class_name = NULL;
+    node->is_class = 0;
+    node->is_virtual = 0;
+    node->is_virtual_call = 0;
+    node->call_struct = NULL;
+    node->func_sym = NULL;
+    node->struct_def = NULL;
     return node;
 }
 
@@ -201,6 +213,7 @@ ASTNode* create_type_node(int type_token) {
             node->data_type = TYPE_VOID;
             break;
         case T_STRUCT:
+        case T_CLASS:
             node->data_type = TYPE_STRUCT;
             break;
         default:
@@ -433,6 +446,15 @@ void print_ast(ASTNode *node, int level) {
             print_ast(node->left, level + 1); // Target
             print_ast(node->right, level + 1); // Value
             break;
+        case NODE_FUNC_CALL:
+            printf("FuncCall: ");
+            if (node->str_val) printf("%s\n", node->str_val);
+            else printf("<dynamic>\n");
+            print_indent(level + 1); printf("Callee:\n");
+            print_ast(node->left, level + 2);
+            print_indent(level + 1); printf("Args:\n");
+            print_ast(node->right, level + 2);
+            break;
         case NODE_BIN_OP:
             printf("BinOp: %s\n", get_op_string(node->int_val));
             print_ast(node->left, level + 1);
@@ -456,8 +478,14 @@ void print_ast(ASTNode *node, int level) {
             break;
         case NODE_STRUCT_DEF:
             printf("StructDef: %s\n", node->str_val);
+            if (node->base_class_name) {
+                print_indent(level + 1); printf("Base Class: %s\n", node->base_class_name);
+            }
             print_indent(level + 1); printf("Members:\n");
             print_ast(node->body, level + 2);
+            break;
+        case NODE_ACCESS_SPEC:
+            printf("AccessSpec: %s\n", node->access_modifier == 0 ? "public" : (node->access_modifier == 1 ? "private" : "protected"));
             break;
         case NODE_CONST_INT:
             printf("Int: %d\n", node->int_val);

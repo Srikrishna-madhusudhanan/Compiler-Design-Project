@@ -13,30 +13,57 @@ static int loop_context_depth = 0;
 static int current_local_offset = 0;
 static int current_param_offset = 16; /* standard positive offset for arg passing */
 
+int get_type_size(DataType t, int pointer_level, Symbol *struct_def);
+
+
+static Symbol *current_class = NULL;
+
+static int current_local_offset = 0;
+static int current_param_offset = 16; /* standard positive offset for arg passing */
+
 int get_type_size(DataType t);
 static Symbol *find_struct_member(Symbol *struct_sym, const char *name) {
     if (!struct_sym || struct_sym->kind != SYM_STRUCT) return NULL;
     Symbol *m = struct_sym->members;
     while (m) {
-        if (strcmp(m->name, name) == 0)
+        if ((m->unmangled_name && strcmp(m->unmangled_name, name) == 0) || strcmp(m->name, name) == 0)
             return m;
-        m = m->next;
+        m = m->next_member;
+    }
+    /* Also check virtual methods */
+    m = struct_sym->virtual_methods;
+    while (m) {
+        if ((m->unmangled_name && strcmp(m->unmangled_name, name) == 0) || strcmp(m->name, name) == 0)
+            return m;
+        m = m->next_member;
     }
     return NULL;
 }
 
-static int get_symbol_size(Symbol *sym) {
-    if (!sym) return 0;
-    if (sym->pointer_level > 0) return 4;
-    if (sym->type == TYPE_INT) return 4;
-    if (sym->type == TYPE_CHAR) return 1;
-    if (sym->type == TYPE_STRUCT) {
-        if (sym->struct_def)
-            return sym->struct_def->struct_size;
-        return 0;
+static Symbol *find_virtual_method(Symbol *struct_sym, const char *name) {
+    Symbol *m = struct_sym->virtual_methods;
+    while (m) {
+        if ((m->unmangled_name && strcmp(m->unmangled_name, name) == 0) || strcmp(m->name, name) == 0)
+            return m;
+        m = m->next_member;
     }
-    return 0;
+    return NULL;
 }
+
+static void replace_virtual_method(Symbol *struct_sym, Symbol *new_method) {
+    Symbol **m = &struct_sym->virtual_methods;
+    while (*m) {
+        if (((*m)->unmangled_name && new_method->unmangled_name && strcmp((*m)->unmangled_name, new_method->unmangled_name) == 0) ||
+            strcmp((*m)->name, new_method->name) == 0) {
+            new_method->next_member = (*m)->next_member;
+            *m = new_method;
+            return;
+        }
+        m = &(*m)->next_member;
+    }
+}
+
+/** get_symbol_size is now redundant, removed. **/
 
 void semantic_error(int line, const char *msg) {
     printf("Semantic Error (line %d): %s\n", line, msg);
@@ -52,7 +79,6 @@ void analyze_struct_def(ASTNode *node) {
         return;
     }
 
-    /* Check for redeclaration */
     Symbol *existing = lookup(node->str_val);
     if (existing) {
         semantic_error(node->line_number, "Struct redeclared");
@@ -65,22 +91,94 @@ void analyze_struct_def(ASTNode *node) {
         return;
     }
 
-    /* Build member list and compute sizes */
+    sym->is_class = node->is_class;
+    current_class = sym;
+    int current_access = node->is_class ? 1 : 0; // 1 = private, 0 = public
     int offset = 0;
+    int has_base_vtable = 0;
+
+    if (node->base_class_name) {
+        Symbol *base = lookup(node->base_class_name);
+        if (!base || base->kind != SYM_STRUCT) {
+            semantic_error(node->line_number, "Unknown base class");
+            return;
+        }
+        sym->base_class = base;
+
+        Symbol *b_mem = base->members;
+        while (b_mem) {
+            Symbol *m = create_symbol(b_mem->name, b_mem->type, b_mem->kind, b_mem->line_number);
+            if (b_mem->unmangled_name) m->unmangled_name = strdup(b_mem->unmangled_name);
+            m->pointer_level = b_mem->pointer_level;
+            m->struct_def = b_mem->struct_def;
+            m->is_array = b_mem->is_array;
+            m->array_size = b_mem->array_size;
+            m->access_modifier = b_mem->access_modifier;
+            m->struct_offset = b_mem->struct_offset;
+            m->next_member = sym->members;
+            sym->members = m;
+            b_mem = b_mem->next_member;
+        }
+
+        Symbol *b_v = base->virtual_methods;
+        while (b_v) {
+            Symbol *v = create_symbol(b_v->name, b_v->type, b_v->kind, b_v->line_number);
+            if (b_v->unmangled_name) v->unmangled_name = strdup(b_v->unmangled_name);
+            v->is_virtual = 1;
+            v->vtable_index = b_v->vtable_index;
+            v->next_member = sym->virtual_methods;
+            sym->virtual_methods = v;
+            b_v = b_v->next_member;
+        }
+
+        offset = base->struct_size;
+        if (base->virtual_methods) has_base_vtable = 1;
+    }
+
     for (ASTNode *member = node->body; member; member = member->next) {
         if (!member) continue;
 
-        Symbol *m = create_symbol(member->str_val,
-                                  member->left->data_type,
-                                  SYM_VARIABLE,
-                                  member->line_number);
+        if (member->type == NODE_ACCESS_SPEC) {
+            current_access = member->access_modifier;
+            continue;
+        }
+
+        if (member->type == NODE_FUNC_DEF) {
+            char mangled_name[256];
+            snprintf(mangled_name, sizeof(mangled_name), "%s_%s", sym->name, member->str_val);
+            char *orig_name = member->str_val;
+            member->str_val = strdup(mangled_name);
+
+            analyze_function(member);
+            Symbol *func = lookup(member->str_val);
+            member->str_val = orig_name; // Restore AST
+
+            if (func) {
+                func->unmangled_name = strdup(orig_name);
+                func->access_modifier = current_access;
+                if (member->is_virtual) {
+                    func->is_virtual = 1;
+                    Symbol *existing_v = find_virtual_method(sym, orig_name);
+                    if (existing_v) {
+                        func->vtable_index = existing_v->vtable_index;
+                        replace_virtual_method(sym, func);
+                    } else {
+                        func->next_member = sym->virtual_methods;
+                        sym->virtual_methods = func;
+                    }
+                }
+            }
+            continue;
+        }
+
+        Symbol *m = create_symbol(member->str_val, member->left->data_type, SYM_VARIABLE, member->line_number);
+        m->access_modifier = current_access;
         m->pointer_level = member->pointer_level;
         m->array_dim_count = member->array_dim_count;
         if (member->array_dim_count > 0) {
             m->array_sizes = malloc(sizeof(int) * member->array_dim_count);
             for (int i = 0; i < member->array_dim_count; i++) {
-                if (member->array_dim_exprs && member->array_dim_exprs[i] &&
-                    member->array_dim_exprs[i]->type == NODE_CONST_INT) {
+                if (member->array_dim_exprs && member->array_dim_exprs[i] && member->array_dim_exprs[i]->type == NODE_CONST_INT) {
                     m->array_sizes[i] = member->array_dim_exprs[i]->int_val;
                 } else {
                     m->array_sizes[i] = -1;
@@ -91,47 +189,63 @@ void analyze_struct_def(ASTNode *node) {
         if (member->left->data_type == TYPE_STRUCT && member->left->str_val) {
             Symbol *sub = lookup(member->left->str_val);
             if (!sub || sub->kind != SYM_STRUCT) {
-                semantic_error(member->line_number,
-                               "Unknown struct type for member");
+                semantic_error(member->line_number, "Unknown struct type for member");
             } else {
                 m->struct_def = sub;
             }
         }
 
-        int size = get_symbol_size(m);
+        int size = get_type_size(m->type, m->pointer_level, m->struct_def);
         if (m->array_dim_count > 0) {
             int total = size;
             for (int i = 0; i < m->array_dim_count; i++) {
-                if (m->array_sizes[i] <= 0) {
-                    total = 0;
-                    break;
-                }
+                if (m->array_sizes[i] <= 0) { total = 0; break; }
                 total *= m->array_sizes[i];
             }
             size = total;
         }
 
-        m->offset = offset;
+        m->struct_offset = offset;
         offset += size;
-
-        /* Add to struct member list */
-        m->next = sym->members;
+        m->next_member = sym->members;
         sym->members = m;
     }
 
     sym->struct_size = offset;
 
-    /* Debug: print struct layout */
-    #ifdef DEBUG
-    printf("Struct %s size=%d\n", sym->name, sym->struct_size);
-    Symbol *m = sym->members;
-    while (m) {
-        printf("  member %s offset=%d size=%d\n", m->name, m->offset, get_symbol_size(m));
-        m = m->next;
-    }
-    #endif
-}
+    if (sym->virtual_methods && !has_base_vtable) {
+        int ptr_size = 4;
+        Symbol *m = sym->members;
+        while (m) {
+            m->struct_offset += ptr_size;
+            m = m->next_member;
+        }
+        sym->struct_size += ptr_size;
 
+        int idx = 0;
+        Symbol *v = sym->virtual_methods;
+        while (v) {
+            v->vtable_index = idx++;
+            v = v->next_member;
+        }
+        sym->vtable_size = idx;
+    } else if (sym->virtual_methods && has_base_vtable) {
+        int idx = 0;
+        Symbol *b_v = sym->base_class->virtual_methods;
+        while (b_v) { idx++; b_v = b_v->next_member; }
+        
+        Symbol *v = sym->virtual_methods;
+        while (v) {
+            if (v->vtable_index == -1) {
+                v->vtable_index = idx++;
+            }
+            v = v->next_member;
+        }
+        sym->vtable_size = idx;
+    }
+    
+    current_class = NULL;
+}
 
 void analyze_function(ASTNode *node) {
 
@@ -198,9 +312,6 @@ void analyze_function(ASTNode *node) {
     // -------------------------------------------------
     param = node->params;
     i = 0;
-    
-    current_local_offset = 0;
-    current_param_offset = 16;
 
     while (param) {
         Symbol *sym = create_symbol(
@@ -215,9 +326,6 @@ void analyze_function(ASTNode *node) {
             sym->is_array = 1;
             sym->array_size = -1; /* unknown size (decayed parameter) */
         }
-
-        sym->offset = current_param_offset;
-        current_param_offset += 4; /* Assign 4 bytes per parameter (assuming 32-bit pointers/ints) */
 
         if (!insert_symbol(sym))
             semantic_error(param->line_number, "Parameter redeclared");
@@ -298,24 +406,6 @@ printf("Declaring %s at scope level %d\n",
             sym->struct_def = struct_sym;
         }
     }
-
-    /* Compute offset and size */
-    int size = get_type_size(node->left->data_type);
-    if (sym->is_array && sym->array_size > 0) {
-        size = size * sym->array_size;
-    } else if (sym->is_array && sym->array_dim_count > 0) {
-        int total_elements = 1;
-        for (int i=0; i < sym->array_dim_count; i++) {
-            if (sym->array_sizes[i] > 0) total_elements *= sym->array_sizes[i];
-        }
-        size = size * total_elements;
-    } else if (sym->pointer_level > 0 || sym->is_array) {
-        size = 4; // pointer size
-    }
-
-    size = (size + 3) & ~3; // Align to 4 bytes boundary
-    current_local_offset += size;
-    sym->offset = -current_local_offset;
 
     if (!insert_symbol(sym))
         semantic_error(node->line_number, "Variable redeclared");
@@ -416,6 +506,8 @@ void analyze_member_access(ASTNode *node) {
         return;
     }
 
+    node->struct_def = struct_def;
+
     Symbol *member = find_struct_member(struct_def, node->str_val);
     if (!member) {
         semantic_error(node->line_number,
@@ -424,9 +516,16 @@ void analyze_member_access(ASTNode *node) {
         return;
     }
 
+    if (member->access_modifier == 1) { // Private
+        // In CD2, methods are processed while current_class is set. 
+        if (!current_class || current_class != struct_def) {
+            semantic_error(node->line_number, "Private member access violation");
+        }
+    }
+
     node->data_type = member->type;
     node->pointer_level = member->pointer_level;
-    node->member_offset = member->offset;
+    node->member_offset = member->struct_offset;
 }
 
 void analyze_assignment(ASTNode *node) {
@@ -528,7 +627,59 @@ void analyze_index(ASTNode *node) {
 
 void analyze_function_call(ASTNode *node) {
 
-    Symbol *sym = lookup(node->str_val);
+    /* Analyze the function expression */
+    analyze_node(node->left);
+
+    Symbol *sym = NULL;
+
+    if (node->left->type == NODE_VAR) {
+        /* Direct function call */
+        sym = lookup(node->left->str_val);
+    } else if (node->left->type == NODE_MEMBER_ACCESS) {
+        /* Method call: find the method in the struct */
+        /* For now, assume it's a virtual method */
+        /* node->left->str_val is member name */
+        /* But we need to get the struct type from the base */
+        /* For simplicity, lookup the function by name */
+        /* For method calls, we may need to get the mangled function symbol */
+        /* node->left->str_val is member name, structure was resolved in analyze_member_access */
+        sym = lookup(node->left->str_val);
+        // for method call we need to find the mangled name.
+        if (node->left->struct_def) {
+            char mangled_name[256];
+            snprintf(mangled_name, sizeof(mangled_name), "%s_%s", node->left->struct_def->name, node->left->str_val);
+            sym = lookup(mangled_name);
+            if (!sym) {
+                // Check base class methods recursively or through virtual_methods list
+                Symbol *v = node->left->struct_def->virtual_methods;
+                while (v) {
+                    if (v->unmangled_name && strcmp(v->unmangled_name, node->left->str_val) == 0) {
+                        sym = lookup(v->name);
+                        break;
+                    }
+                    v = v->next_member;
+                }
+            }
+        }
+        if (sym && sym->is_virtual) {
+            node->is_virtual_call = 1;
+            node->call_struct = node->left->struct_def;
+            /* Add the object as first argument */
+            ASTNode *obj_expr = node->left->left;
+            /* For pointer, pass as is; for value, take address */
+            /* Assume for struct value, passing by value. Since unary & is not supported
+               we just keep or mock evaluating the object. */
+            if (obj_expr->data_type == TYPE_STRUCT && obj_expr->pointer_level == 0) {
+                obj_expr = create_unary_node('*', obj_expr);
+            }
+            // Prepend obj_expr to arg list
+            obj_expr->next = node->right;
+            node->right = obj_expr;
+        }
+    } else {
+        semantic_error(node->line_number, "Invalid function call expression");
+        return;
+    }
 
     if (!sym || sym->kind != SYM_FUNCTION) {
         semantic_error(node->line_number,
@@ -536,7 +687,9 @@ void analyze_function_call(ASTNode *node) {
         return;
     }
 
-    ASTNode *arg = node->left;
+    node->func_sym = sym;
+
+    ASTNode *arg = node->right;
     int i = 0;
 
     while (arg) {
@@ -850,11 +1003,15 @@ int analyze_list(ASTNode *node) {
     return returns;
 }
 
-int get_type_size(DataType t) {
+int get_type_size(DataType t, int pointer_level, Symbol *struct_def) {
+    if (pointer_level > 0) return 4;
     if (t == TYPE_INT) return 4;
     if (t == TYPE_CHAR) return 1;
     if (t == TYPE_VOID) return 0;
-    if (t == TYPE_STRUCT) return 0; // size unknown here (use struct_def->struct_size if available)
+    if (t == TYPE_STRUCT) {
+        if (struct_def) return struct_def->struct_size;
+        return 0;
+    }
     return 4; // default
 }
 

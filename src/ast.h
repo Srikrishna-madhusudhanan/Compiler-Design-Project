@@ -30,7 +30,8 @@ typedef enum {
     NODE_ARRAY_DECL,   /* array declaration */
     NODE_INDEX,        /* a[i] indexing expression */
     NODE_MEMBER_ACCESS,/* struct member access (., ->) */
-    NODE_STRUCT_DEF    /* struct definition */
+    NODE_STRUCT_DEF,   /* struct definition */
+    NODE_ACCESS_SPEC   /* access specifier */
 } NodeType;
 
 typedef struct ASTNode {
@@ -62,6 +63,23 @@ typedef struct ASTNode {
     int pointer_level;
     int array_dim_count;
     struct ASTNode **array_dim_exprs;
+
+    // Virtual function flag
+    int is_virtual;
+    // Virtual call flag
+    int is_virtual_call;
+    // For calls: the struct type for virtual calls
+    struct Symbol *call_struct;
+    // For func calls: the function symbol
+    struct Symbol *func_sym;
+    // For member access: the struct type
+    struct Symbol *struct_def;
+    // For class/struct def: is class
+    int is_class;
+    // For class def: base class name
+    char *base_class_name;
+    // For access modifiers inside structs/classes (0=public, 1=private, 2=protected)
+    int access_modifier;
 } ASTNode;
 
 

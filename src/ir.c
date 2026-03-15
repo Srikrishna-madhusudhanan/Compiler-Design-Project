@@ -126,6 +126,16 @@ IRInstr* ir_make_call_void(char *fn, int nargs, int line) {
     return i;
 }
 
+IRInstr* ir_make_call_indirect(char *dst, IROperand fn_ptr, int nargs, int line) {
+    IRInstr *i = calloc(1, sizeof(IRInstr));
+    i->kind = IR_CALL_INDIRECT;
+    i->line = line;
+    i->result = dst;
+    i->base = fn_ptr;
+    i->arg_count = nargs;
+    return i;
+}
+
 IRInstr* ir_make_return_val(IROperand op, int line) {
     IRInstr *i = calloc(1, sizeof(IRInstr));
     i->kind = IR_RETURN;
@@ -305,6 +315,14 @@ void ir_print_instr(IRInstr *instr) {
             else
                 printf("  call %s, %d\n", instr->call_fn, instr->arg_count);
             break;
+        case IR_CALL_INDIRECT:
+            if (instr->result)
+                printf("  %s := call *", instr->result);
+            else
+                printf("  call *");
+            print_operand(&instr->base);
+            printf(", %d\n", instr->arg_count);
+            break;
         case IR_RETURN:
             if (instr->src.name || instr->src.is_const) {
                 printf("  return ");
@@ -414,6 +432,15 @@ void ir_export_to_file(IRProgram *prog, const char *filename) {
                     else
                         fprintf(f, "  call %s, %d\n", i->call_fn, i->arg_count);
                     break;
+                case IR_CALL_INDIRECT:
+                    if (i->result)
+                        fprintf(f, "  %s := call *", i->result);
+                    else
+                        fprintf(f, "  call *");
+                    if (i->base.is_const) fprintf(f, "%d", i->base.const_val);
+                    else fprintf(f, "%s", i->base.name);
+                    fprintf(f, ", %d\n", i->arg_count);
+                    break;
                 case IR_RETURN:
                     if (i->src.name || i->src.is_const) {
                         fprintf(f, "  return ");
@@ -493,6 +520,10 @@ void ir_free_instr(IRInstr *instr) {
         case IR_CALL:
             if (instr->result) free(instr->result);
             if (instr->call_fn) free(instr->call_fn);
+            break;
+        case IR_CALL_INDIRECT:
+            if (instr->result) free(instr->result);
+            if (instr->base.name) free(instr->base.name);
             break;
         case IR_RETURN:
             if (instr->src.name) free(instr->src.name);

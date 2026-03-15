@@ -58,28 +58,33 @@ extern int yydebug;
     T_VOID = 259,                  /* T_VOID  */
     T_CHAR = 260,                  /* T_CHAR  */
     T_STRUCT = 261,                /* T_STRUCT  */
-    T_IF = 262,                    /* T_IF  */
-    T_ELSE = 263,                  /* T_ELSE  */
-    T_WHILE = 264,                 /* T_WHILE  */
-    T_FOR = 265,                   /* T_FOR  */
-    T_RETURN = 266,                /* T_RETURN  */
-    T_SWITCH = 267,                /* T_SWITCH  */
-    T_CASE = 268,                  /* T_CASE  */
-    T_DEFAULT = 269,               /* T_DEFAULT  */
-    T_BREAK = 270,                 /* T_BREAK  */
-    T_CONTINUE = 271,              /* T_CONTINUE  */
-    T_IDENT = 272,                 /* T_IDENT  */
-    T_STRING_LIT = 273,            /* T_STRING_LIT  */
-    T_NUMBER = 274,                /* T_NUMBER  */
-    T_CHAR_LIT = 275,              /* T_CHAR_LIT  */
-    T_ARROW = 276,                 /* T_ARROW  */
-    T_EQ = 277,                    /* T_EQ  */
-    T_NEQ = 278,                   /* T_NEQ  */
-    T_LE = 279,                    /* T_LE  */
-    T_GE = 280,                    /* T_GE  */
-    T_AND = 281,                   /* T_AND  */
-    T_OR = 282,                    /* T_OR  */
-    LOWER_THAN_ELSE = 283          /* LOWER_THAN_ELSE  */
+    T_VIRTUAL = 262,               /* T_VIRTUAL  */
+    T_CLASS = 263,                 /* T_CLASS  */
+    T_PUBLIC = 264,                /* T_PUBLIC  */
+    T_PRIVATE = 265,               /* T_PRIVATE  */
+    T_COLON = 266,                 /* T_COLON  */
+    T_IF = 267,                    /* T_IF  */
+    T_ELSE = 268,                  /* T_ELSE  */
+    T_WHILE = 269,                 /* T_WHILE  */
+    T_FOR = 270,                   /* T_FOR  */
+    T_RETURN = 271,                /* T_RETURN  */
+    T_SWITCH = 272,                /* T_SWITCH  */
+    T_CASE = 273,                  /* T_CASE  */
+    T_DEFAULT = 274,               /* T_DEFAULT  */
+    T_BREAK = 275,                 /* T_BREAK  */
+    T_CONTINUE = 276,              /* T_CONTINUE  */
+    T_IDENT = 277,                 /* T_IDENT  */
+    T_STRING_LIT = 278,            /* T_STRING_LIT  */
+    T_NUMBER = 279,                /* T_NUMBER  */
+    T_CHAR_LIT = 280,              /* T_CHAR_LIT  */
+    T_ARROW = 281,                 /* T_ARROW  */
+    T_EQ = 282,                    /* T_EQ  */
+    T_NEQ = 283,                   /* T_NEQ  */
+    T_LE = 284,                    /* T_LE  */
+    T_GE = 285,                    /* T_GE  */
+    T_AND = 286,                   /* T_AND  */
+    T_OR = 287,                    /* T_OR  */
+    LOWER_THAN_ELSE = 288          /* LOWER_THAN_ELSE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -88,13 +93,13 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 27 "src/parser.y"
+#line 48 "src/parser.y"
 
     int intval;
     char *str;
     struct ASTNode *node;
 
-#line 98 "build/y.tab.h"
+#line 103 "build/y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
