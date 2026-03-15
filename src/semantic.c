@@ -100,6 +100,39 @@ char* get_mangled_name(const char *prefix, const char *name, ASTNode *params) {
     return strdup(buf);
 }
 
+const char* type_to_string(DataType t);
+char* get_mangled_name(const char *prefix, const char *name, ASTNode *params);
+
+const char* type_to_string(DataType t) {
+    switch (t) {
+        case TYPE_INT: return "int";
+        case TYPE_CHAR: return "char";
+        case TYPE_VOID: return "void";
+        case TYPE_STRUCT: return "struct";
+        default: return "unknown";
+    }
+}
+
+char* get_mangled_name(const char *prefix, const char *name, ASTNode *params) {
+    char buf[512];
+    if (prefix)
+        snprintf(buf, sizeof(buf), "%s_%s", prefix, name);
+    else
+        snprintf(buf, sizeof(buf), "%s", name);
+    
+    ASTNode *p = params;
+    while (p) {
+        if (p->str_val && strcmp(p->str_val, "this") == 0) {
+            p = p->next;
+            continue;
+        }
+        strcat(buf, "_");
+        strcat(buf, type_to_string(p->left->data_type));
+        p = p->next;
+    }
+    return strdup(buf);
+}
+
 void analyze_struct_def(ASTNode *node) {
     if (!node || node->type != NODE_STRUCT_DEF) return;
 
@@ -211,13 +244,7 @@ void analyze_struct_def(ASTNode *node) {
 
             analyze_function(member);
             Symbol *func = lookup(member->str_val);
-            if (func) {
-                Symbol *m = create_symbol(orig_name, func->type, SYM_FUNCTION, member->line_number);
-                m->unmangled_name = strdup(member->str_val);
-                m->access_modifier = current_access;
-                m->next_member = sym->members;
-                sym->members = m;
-            }
+            member->str_val = orig_name; // Restore AST
 
             if (func) {
                 func->unmangled_name = strdup(orig_name);
