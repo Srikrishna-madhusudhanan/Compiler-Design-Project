@@ -452,11 +452,11 @@ switch_clause_list
     ;
 
 switch_clause
-    : T_CASE expression ':' statement_list_opt {
+    : T_CASE expression T_COLON statement_list_opt {
         $$ = create_case_node($2, $4);
         SET_LINE($$);
     }
-    | T_DEFAULT ':' statement_list_opt {
+    | T_DEFAULT T_COLON statement_list_opt {
         $$ = create_case_node(NULL, $3);
         SET_LINE($$);
     }

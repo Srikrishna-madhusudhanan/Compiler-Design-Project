@@ -1,8 +1,10 @@
 int main() {
     int *p;
-    int a[5];
-    int b[2][3];
+    int n;
+    n = 5;
+    int a[n];
+    int b[2][3][6];
     a[0] = 1;
-    b[0][1] = 3;
+    b[0][1][2] = 3;
     return 0;
 }
