@@ -18,10 +18,6 @@ int get_type_size(DataType t, int pointer_level, Symbol *struct_def);
 
 static Symbol *current_class = NULL;
 
-static int current_local_offset = 0;
-static int current_param_offset = 16; /* standard positive offset for arg passing */
-
-int get_type_size(DataType t);
 static Symbol *find_struct_member(Symbol *struct_sym, const char *name) {
     if (!struct_sym || struct_sym->kind != SYM_STRUCT) return NULL;
     Symbol *m = struct_sym->members;
@@ -313,6 +309,9 @@ void analyze_function(ASTNode *node) {
     param = node->params;
     i = 0;
 
+    current_local_offset = 0;
+    current_param_offset = 16;
+
     while (param) {
         Symbol *sym = create_symbol(
             param->str_val,
@@ -326,6 +325,9 @@ void analyze_function(ASTNode *node) {
             sym->is_array = 1;
             sym->array_size = -1; /* unknown size (decayed parameter) */
         }
+
+        sym->frame_offset = current_param_offset;
+        current_param_offset += 4; /* Assign 4 bytes per parameter (assuming 32-bit pointers/ints) */
 
         if (!insert_symbol(sym))
             semantic_error(param->line_number, "Parameter redeclared");
@@ -406,6 +408,24 @@ printf("Declaring %s at scope level %d\n",
             sym->struct_def = struct_sym;
         }
     }
+
+    /* Compute offset and size */
+    int size = get_type_size(node->left->data_type, sym->pointer_level, sym->struct_def);
+    if (sym->is_array && sym->array_size > 0) {
+        size = size * sym->array_size;
+    } else if (sym->is_array && sym->array_dim_count > 0) {
+        int total_elements = 1;
+        for (int i=0; i < sym->array_dim_count; i++) {
+            if (sym->array_sizes[i] > 0) total_elements *= sym->array_sizes[i];
+        }
+        size = size * total_elements;
+    } else if (sym->pointer_level > 0 || sym->is_array) {
+        size = 4; // pointer size
+    }
+
+    size = (size + 3) & ~3; // Align to 4 bytes boundary
+    current_local_offset += size;
+    sym->frame_offset = -current_local_offset;
 
     if (!insert_symbol(sym))
         semantic_error(node->line_number, "Variable redeclared");

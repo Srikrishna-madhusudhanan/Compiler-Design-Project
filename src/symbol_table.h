@@ -28,10 +28,6 @@ typedef struct Symbol {
 
     int line_number;
     int scope_level;
-    
-    int offset;          // Offset relative to FP (s0)
-    int local_vars_size; // For functions: total size of local variables
-
 
     int frame_offset;    // Offset relative to FP (s0)
     int local_vars_size; // For functions: total size of local variables
