@@ -443,93 +443,83 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
 
         case NODE_FUNC_CALL: {
             int nargs = 0;
-            ASTNode *arg = node->right;  // args are in right
+            ASTNode *arg = node->right;
             char *obj_name = NULL;
-            if (node->left->type == NODE_MEMBER_ACCESS && node->is_virtual_call) {
+            IROperand func_ptr_op;
+            int is_virtual = node->is_virtual_call;
+            int is_method = (node->left->type == NODE_MEMBER_ACCESS);
+
+            if (is_method) {
+                /* For virtual/method calls, the first arg is the object pointer. */
                 if (arg && arg->type == NODE_VAR) {
                     obj_name = strdup(arg->str_val);
-                } else if (arg && arg->type == NODE_UN_OP && arg->int_val == '*') { 
-                    /* if it's *d */
-                    if (arg->left && arg->left->type == NODE_VAR) {
-                        obj_name = strdup(arg->left->str_val);
-                    }
                 }
             }
+
+            if (is_virtual) {
+                /* Virtual call: load func pointer from vtable first */
+                IROperand obj = ir_op_name(obj_name ? obj_name : "obj");
+                char *vtable_temp = ir_new_temp();
+                ir_append(list, ir_make_load(vtable_temp, obj, ir_op_const(0), 4, line));
+                
+                int idx = node->func_sym ? node->func_sym->vtable_index : 0;
+                char *func_temp = ir_new_temp();
+                ir_append(list, ir_make_load(func_temp, ir_op_name(vtable_temp), ir_op_const(idx), 4, line));
+                
+                func_ptr_op = ir_op_name(func_temp);
+                
+                free(vtable_temp);
+                free(func_temp);
+                if (obj.name) free(obj.name);
+            } else if (is_method) {
+                /* Non-virtual method call */
+                char *fn = node->func_sym ? node->func_sym->name : node->left->str_val;
+                func_ptr_op = ir_op_name(fn);
+            } else if (node->left->type == NODE_VAR) {
+                /* Direct function call */
+                func_ptr_op = ir_op_name(node->left->str_val);
+            } else {
+                /* Unsupported */
+                if (obj_name) free(obj_name);
+                return ir_op_const(0);
+            }
+
+            /* Now emit params */
+            arg = node->right;
             while (arg) {
                 IROperand a = gen_expr(arg, list);
-                if (nargs == 0 && !obj_name && a.name) obj_name = strdup(a.name);
                 ir_append(list, ir_make_param(a, line));
                 if (a.name) free(a.name);
                 nargs++;
                 arg = arg->next;
             }
-            /* Check if method call */
-            if (node->left->type == NODE_MEMBER_ACCESS) {
-                /* Method call */
-                if (node->is_virtual_call) {
-                    /* Virtual call */
-                    IROperand obj = ir_op_name(obj_name ? obj_name : "obj");
-                    char *vtable_temp = ir_new_temp();
-                    ir_append(list, ir_make_load(vtable_temp, obj, ir_op_const(0), 4, line));
-                    int idx = node->func_sym ? node->func_sym->vtable_index : 0;
-                    char *func_temp = ir_new_temp();
-                    ir_append(list, ir_make_load(func_temp, ir_op_name(vtable_temp), ir_op_const(idx), 4, line));
-                    int is_void = (node->data_type == TYPE_VOID);
-                    if (is_void) {
-                        ir_append(list, (IRInstr*)ir_make_call_indirect(NULL, ir_op_name(func_temp), nargs, line));
-                    } else {
-                        char *t = ir_new_temp();
-                        ir_append(list, ir_make_call_indirect(t, ir_op_name(func_temp), nargs, line));
-                        IROperand res = ir_op_name(t);
-                        free(t);
-                        free(vtable_temp);
-                        free(func_temp);
-                        if (obj.name) free(obj.name);
-                        if (obj_name) free(obj_name);
-                        return res;
-                    }
-                    free(vtable_temp);
-                    free(func_temp);
-                    if (obj.name) free(obj.name);
-                    if (obj_name) free(obj_name);
-                    return ir_op_const(0);
-                } else {
-                    /* Non-virtual method, direct call */
-                    /* For now, assume the member is the function name */
-                    char *fn = node->func_sym ? node->func_sym->name : node->left->str_val;
-                    int is_void = (node->data_type == TYPE_VOID);
-                    if (is_void) {
-                        ir_append(list, ir_make_call_void(fn, nargs, line));
-                        if (obj_name) free(obj_name);
-                        return ir_op_const(0);
-                    }
-                    char *t = ir_new_temp();
-                    ir_append(list, ir_make_call(t, fn, nargs, line));
-                    IROperand res = ir_op_name(t);
-                    free(t);
-                    if (obj_name) free(obj_name);
-                    return res;
-                }
-            } else if (node->left->type == NODE_VAR) {
-                /* Direct function call */
-                char *fn = node->left->str_val;
-                int is_void = (node->data_type == TYPE_VOID);
+
+            /* Finally call */
+            int is_void = (node->data_type == TYPE_VOID);
+            IROperand res_op = ir_op_const(0);
+            if (is_virtual) {
                 if (is_void) {
-                    ir_append(list, ir_make_call_void(fn, nargs, line));
-                    if (obj_name) free(obj_name);
-                    return ir_op_const(0);
+                    ir_append(list, (IRInstr*)ir_make_call_indirect(NULL, func_ptr_op, nargs, line));
+                } else {
+                    char *t = ir_new_temp();
+                    ir_append(list, ir_make_call_indirect(t, func_ptr_op, nargs, line));
+                    res_op = ir_op_name(t);
+                    free(t);
                 }
-                char *t = ir_new_temp();
-                ir_append(list, ir_make_call(t, fn, nargs, line));
-                IROperand res = ir_op_name(t);
-                free(t);
-                if (obj_name) free(obj_name);
-                return res;
             } else {
-                /* Other func expr, not supported */
-                if (obj_name) free(obj_name);
-                return ir_op_const(0);
+                if (is_void) {
+                    ir_append(list, ir_make_call_void(func_ptr_op.name, nargs, line));
+                } else {
+                    char *t = ir_new_temp();
+                    ir_append(list, ir_make_call(t, func_ptr_op.name, nargs, line));
+                    res_op = ir_op_name(t);
+                    free(t);
+                }
             }
+
+            if (obj_name) free(obj_name);
+            ir_free_operand(&func_ptr_op);
+            return res_op;
         }
 
         default:

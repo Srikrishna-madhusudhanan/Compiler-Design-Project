@@ -779,11 +779,7 @@ void analyze_function_call(ASTNode *node) {
             /* Add the object as first argument */
             ASTNode *obj_expr = node->left->left;
             /* For pointer, pass as is; for value, take address */
-            /* Assume for struct value, passing by value. Since unary & is not supported
-               we just keep or mock evaluating the object. */
-            if (obj_expr->data_type == TYPE_STRUCT && obj_expr->pointer_level == 0) {
-                obj_expr = create_unary_node('*', obj_expr);
-            }
+            /* Assume for struct value, passing by value. */
             // Prepend obj_expr to arg list
             obj_expr->next = node->right;
             node->right = obj_expr;
