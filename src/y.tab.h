@@ -78,13 +78,14 @@ extern int yydebug;
     T_NUMBER = 279,                /* T_NUMBER  */
     T_CHAR_LIT = 280,              /* T_CHAR_LIT  */
     T_ARROW = 281,                 /* T_ARROW  */
-    T_EQ = 282,                    /* T_EQ  */
-    T_NEQ = 283,                   /* T_NEQ  */
-    T_LE = 284,                    /* T_LE  */
-    T_GE = 285,                    /* T_GE  */
-    T_AND = 286,                   /* T_AND  */
-    T_OR = 287,                    /* T_OR  */
-    LOWER_THAN_ELSE = 288          /* LOWER_THAN_ELSE  */
+    T_TILDE = 282,                 /* T_TILDE  */
+    T_EQ = 283,                    /* T_EQ  */
+    T_NEQ = 284,                   /* T_NEQ  */
+    T_LE = 285,                    /* T_LE  */
+    T_GE = 286,                    /* T_GE  */
+    T_AND = 287,                   /* T_AND  */
+    T_OR = 288,                    /* T_OR  */
+    LOWER_THAN_ELSE = 289          /* LOWER_THAN_ELSE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -99,7 +100,7 @@ union YYSTYPE
     char *str;
     struct ASTNode *node;
 
-#line 103 "build/y.tab.h"
+#line 104 "build/y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

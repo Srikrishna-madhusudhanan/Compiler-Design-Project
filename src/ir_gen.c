@@ -61,6 +61,59 @@ static const char *current_continue_label(void) {
     return continue_label_stack[continue_label_top - 1];
 }
 
+/* Destructor scope tracking */
+typedef struct {
+    char *var_name;
+    char *dtor_name;
+} DtorInfo;
+
+#define MAX_DTOR_STACK 256
+static DtorInfo dtor_stack[MAX_DTOR_STACK];
+static int dtor_top = 0;
+static int dtor_scope_markers[MAX_BREAK_DEPTH];
+static int dtor_scope_depth = 0;
+
+static void push_dtor(const char *var, const char *dtor) {
+    if (dtor_top < MAX_DTOR_STACK) {
+        dtor_stack[dtor_top].var_name = strdup(var);
+        dtor_stack[dtor_top].dtor_name = strdup(dtor);
+        dtor_top++;
+    }
+}
+
+static void pop_dtors_to(int target_top, IRInstr **list, int line) {
+    for (int i = dtor_top - 1; i >= target_top; i--) {
+        IROperand self = ir_op_name(dtor_stack[i].var_name);
+        ir_append(list, ir_make_param(self, line));
+        ir_append(list, ir_make_call_void(dtor_stack[i].dtor_name, 1, line));
+        if (self.name) free(self.name);
+        free(dtor_stack[i].var_name);
+        free(dtor_stack[i].dtor_name);
+    }
+    dtor_top = target_top;
+}
+
+static void emit_dtors_up_to(int target_top, IRInstr **list, int line) {
+    for (int i = dtor_top - 1; i >= target_top; i--) {
+        IROperand self = ir_op_name(dtor_stack[i].var_name);
+        ir_append(list, ir_make_param(self, line));
+        ir_append(list, ir_make_call_void(dtor_stack[i].dtor_name, 1, line));
+        if (self.name) free(self.name);
+    }
+}
+
+static void enter_dtor_scope() {
+    if (dtor_scope_depth < MAX_BREAK_DEPTH) {
+        dtor_scope_markers[dtor_scope_depth++] = dtor_top;
+    }
+}
+
+static void exit_dtor_scope(IRInstr **list, int line) {
+    if (dtor_scope_depth > 0) {
+        pop_dtors_to(dtor_scope_markers[--dtor_scope_depth], list, line);
+    }
+}
+
 static void get_index_info(ASTNode *node, char **base_name, IROperand *index_op, IRInstr **list, int line) {
     ASTNode *indices[10];
     int num_indices = 0;
@@ -495,10 +548,13 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
         case NODE_TYPE:
             break;
 
-        case NODE_BLOCK:
+        case NODE_BLOCK: {
+            enter_dtor_scope();
             for (ASTNode *s = node->left; s; s = s->next)
                 gen_stmt(s, list);
+            exit_dtor_scope(list, line);
             break;
+        }
 
         case NODE_IF: {
             char *L_then = ir_new_label();
@@ -523,16 +579,16 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
             char *L_cond = ir_new_label();
             char *L_body = ir_new_label();
             char *L_end = ir_new_label();
+            push_break_label(L_end);
+            push_continue_label(L_cond);
             ir_append(list, ir_make_label(L_cond, line));
             gen_cond(node->cond, list, L_body, L_end, line);
             ir_append(list, ir_make_label(L_body, line));
-            push_break_label(L_end);
-            push_continue_label(L_cond);
-            gen_stmt(node->body, list);
-            pop_continue_label();
-            pop_break_label();
+            gen_stmt(node->left, list);
             ir_append(list, ir_make_goto(L_cond, line));
             ir_append(list, ir_make_label(L_end, line));
+            pop_break_label();
+            pop_continue_label();
             free(L_cond);
             free(L_body);
             free(L_end);
@@ -648,10 +704,13 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
         case NODE_RETURN:
             if (node->left) {
                 IROperand val = gen_expr(node->left, list);
+                emit_dtors_up_to(0, list, line);
                 ir_append(list, ir_make_return_val(val, line));
                 if (val.name) free(val.name);
-            } else
+            } else {
+                emit_dtors_up_to(0, list, line);
                 ir_append(list, ir_make_return(line));
+            }
             break;
 
         case NODE_BREAK: {
@@ -684,6 +743,24 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
                 ir_append(list, ir_make_store(base, ir_op_const(0), 4, vtable_op, line));
                 if (vtable_op.name) free(vtable_op.name);
                 if (base.name) free(base.name);
+            }
+            if (sym && sym->struct_def) {
+                char dtor_name[256];
+                snprintf(dtor_name, sizeof(dtor_name), "%s__dtor", sym->struct_def->name);
+                Symbol *dtor = lookup(dtor_name);
+                if (dtor) {
+                    push_dtor(node->str_val, dtor_name);
+                }
+
+                char ctor_name[256];
+                snprintf(ctor_name, sizeof(ctor_name), "%s__ctor", sym->struct_def->name);
+                Symbol *ctor = lookup(ctor_name);
+                if (ctor) {
+                    IROperand self = ir_op_name(node->str_val);
+                    ir_append(list, ir_make_param(self, line));
+                    ir_append(list, ir_make_call_void(ctor_name, 1, line));
+                    if (self.name) free(self.name);
+                }
             }
             if (node->right) {
                 IROperand init = gen_expr(node->right, list);
