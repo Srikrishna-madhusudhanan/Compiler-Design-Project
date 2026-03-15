@@ -25,6 +25,10 @@ typedef struct Symbol {
 
     int line_number;
     int scope_level;
+    
+    int offset;          // Offset relative to FP (s0)
+    int local_vars_size; // For functions: total size of local variables
+
 
     /* Array information (for variables/parameters) */
     /* is_array: 1 if this symbol represents an array object */

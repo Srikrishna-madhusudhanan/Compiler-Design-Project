@@ -5,3 +5,4 @@ venv/
 # Outputs
 *.dot
 ir.txt
+stack_frame_reference.txt

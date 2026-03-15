@@ -8,6 +8,11 @@ static Symbol *current_function = NULL;
 int semantic_errors = 0;
 static int break_context_depth = 0;
 
+static int current_local_offset = 0;
+static int current_param_offset = 16; /* standard positive offset for arg passing */
+
+int get_type_size(DataType t);
+
 void semantic_error(int line, const char *msg) {
     printf("Semantic Error (line %d): %s\n", line, msg);
     semantic_errors++;
@@ -79,6 +84,9 @@ void analyze_function(ASTNode *node) {
     // -------------------------------------------------
     param = node->params;
     i = 0;
+    
+    current_local_offset = 0;
+    current_param_offset = 16;
 
     while (param) {
         Symbol *sym = create_symbol(
@@ -94,6 +102,9 @@ void analyze_function(ASTNode *node) {
             sym->array_size = -1; /* unknown size (decayed parameter) */
         }
 
+        sym->offset = current_param_offset;
+        current_param_offset += 4; /* Assign 4 bytes per parameter (assuming 32-bit pointers/ints) */
+
         if (!insert_symbol(sym))
             semantic_error(param->line_number, "Parameter redeclared");
 
@@ -105,6 +116,8 @@ void analyze_function(ASTNode *node) {
     // Analyze function body
     // -------------------------------------------------
     int body_returns = analyze_node(node->body);
+
+    current_function->local_vars_size = current_local_offset;
 
      if (current_function->type != TYPE_VOID && !body_returns) {
         semantic_error(node->line_number,
@@ -160,6 +173,24 @@ printf("Declaring %s at scope level %d\n",
             }
         }
     }
+
+    /* Compute offset and size */
+    int size = get_type_size(node->left->data_type);
+    if (sym->is_array && sym->array_size > 0) {
+        size = size * sym->array_size;
+    } else if (sym->is_array && sym->array_dim_count > 0) {
+        int total_elements = 1;
+        for (int i=0; i < sym->array_dim_count; i++) {
+            if (sym->array_sizes[i] > 0) total_elements *= sym->array_sizes[i];
+        }
+        size = size * total_elements;
+    } else if (sym->pointer_level > 0 || sym->is_array) {
+        size = 4; // pointer size
+    }
+
+    size = (size + 3) & ~3; // Align to 4 bytes boundary
+    current_local_offset += size;
+    sym->offset = -current_local_offset;
 
     if (!insert_symbol(sym))
         semantic_error(node->line_number, "Variable redeclared");

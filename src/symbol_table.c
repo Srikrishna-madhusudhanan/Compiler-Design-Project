@@ -76,6 +76,8 @@ Symbol *create_symbol(char *name, DataType type,
     sym->kind = kind;
     sym->line_number = line;
     sym->scope_level = current_scope->level;
+    sym->offset = 0;
+    sym->local_vars_size = 0;
 
     /* Default: not an array symbol */
     sym->is_array = 0;
@@ -170,12 +172,14 @@ void print_scope(Scope *scope) {
     for (int i = 0; i < TABLE_SIZE; i++) {
         Symbol *sym = scope->table[i];
         while (sym) {
-            printf("Name: %-10s | Type: %-6s | Kind: %-9s | Line: %d | Scope: %d",
+            printf("Name: %-10s | Type: %-6s | Kind: %-9s | Line: %d | Scope: %d | Offset: %d",
             sym->name,
             data_type_to_string(sym->type),
             symbol_kind_to_string(sym->kind),
             sym->line_number,
-            sym->scope_level);
+            sym->scope_level,
+            sym->offset);
+            if (sym->kind == SYM_FUNCTION) printf(" | L_Size: %d", sym->local_vars_size);
             if (sym->pointer_level > 0) printf(" | Ptr: %d", sym->pointer_level);
             if (sym->array_dim_count > 0) {
                 printf(" | Dims: [");
