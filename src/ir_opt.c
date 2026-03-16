@@ -219,10 +219,14 @@ static int strength_reduction(IRInstr *instr) {
         if (instr->right.is_const && instr->right.const_val == 2) {
             instr->binop = '+';
             instr->right = instr->left;
+            /* DEEP COPY to prevent double free! */
+            if (instr->left.name) instr->right.name = strdup(instr->left.name); 
             return 1;
         } else if (instr->left.is_const && instr->left.const_val == 2) {
             instr->binop = '+';
             instr->left = instr->right;
+            /* DEEP COPY to prevent double free! */
+            if (instr->right.name) instr->left.name = strdup(instr->right.name); 
             return 1;
         }
     }
@@ -692,6 +696,21 @@ void unroll_loops(CFG *cfg) {
                     IRInstr *clone = malloc(sizeof(IRInstr));
                     memcpy(clone, curr, sizeof(IRInstr));
                     clone->next = NULL;
+                    
+                    /* DEEP COPY all strings to prevent double-frees */
+                    if (curr->result) clone->result = strdup(curr->result);
+                    if (curr->left.name) clone->left.name = strdup(curr->left.name);
+                    if (curr->right.name) clone->right.name = strdup(curr->right.name);
+                    if (curr->src.name) clone->src.name = strdup(curr->src.name);
+                    if (curr->unop_src.name) clone->unop_src.name = strdup(curr->unop_src.name);
+                    if (curr->base.name) clone->base.name = strdup(curr->base.name);
+                    if (curr->index.name) clone->index.name = strdup(curr->index.name);
+                    if (curr->store_val.name) clone->store_val.name = strdup(curr->store_val.name);
+                    if (curr->if_left.name) clone->if_left.name = strdup(curr->if_left.name);
+                    if (curr->if_right.name) clone->if_right.name = strdup(curr->if_right.name);
+                    if (curr->label) clone->label = strdup(curr->label);
+                    if (curr->call_fn) clone->call_fn = strdup(curr->call_fn);
+                    
                     if (!clone_head) clone_head = clone;
                     if (clone_tail) clone_tail->next = clone;
                     clone_tail = clone;
