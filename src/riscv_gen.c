@@ -5,7 +5,7 @@
 #include "symbol_table.h"  
 #include "riscv_gen.h"
 
-// --- Dynamic Temp Tracker ---
+// 
 typedef struct {
     char name[64];
     int offset;

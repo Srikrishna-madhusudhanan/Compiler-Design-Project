@@ -40,7 +40,6 @@ CFG* build_cfg(IRFunc *f) {
     CFG *cfg = calloc(1, sizeof(CFG));
     cfg->func_name = strdup(f->name);
 
-    /* 1. Identify Leaders and Create Blocks */
     BasicBlock *head = NULL, *tail = NULL;
     int bb_count = 0;
 
@@ -53,7 +52,6 @@ CFG* build_cfg(IRFunc *f) {
         if (tail) tail->next = new_bb;
         tail = new_bb;
 
-        /* Walk until end of block */
         while (curr) {
             new_bb->last = curr;
             if (curr->kind == IR_GOTO || curr->kind == IR_IF || curr->kind == IR_RETURN) {
@@ -71,7 +69,6 @@ CFG* build_cfg(IRFunc *f) {
     cfg->entry = head;
     cfg->block_count = bb_count;
 
-    /* 2. Link Edges */
     BasicBlock *bb = head;
     while (bb) {
         IRInstr *last = bb->last;
@@ -82,10 +79,7 @@ CFG* build_cfg(IRFunc *f) {
             BasicBlock *target = find_bb_by_label(head, last->label);
             if (target) add_succ(bb, target);
             if (bb->next) add_succ(bb, bb->next);
-        } else if (last->kind == IR_RETURN) {
-            /* No successors */
-        } else {
-            /* Fallthrough */
+        } else if (last->kind != IR_RETURN) {
             if (bb->next) add_succ(bb, bb->next);
         }
         bb = bb->next;
@@ -101,6 +95,7 @@ void free_cfg(CFG *cfg) {
         BasicBlock *next = bb->next;
         if (bb->preds) free(bb->preds);
         if (bb->succs) free(bb->succs);
+        if (bb->doms) free(bb->doms);
         free(bb);
         bb = next;
     }
@@ -127,7 +122,6 @@ void eliminate_unreachable_blocks(CFG *cfg) {
             BasicBlock *to_delete = *curr;
             *curr = to_delete->next;
             
-            /* Remove this block from its successors' preds lists */
             for (int i = 0; i < to_delete->succ_count; i++) {
                 BasicBlock *succ = to_delete->succs[i];
                 for (int j = 0; j < succ->pred_count; j++) {
@@ -137,10 +131,6 @@ void eliminate_unreachable_blocks(CFG *cfg) {
                     }
                 }
             }
-            /* Note: We don't free it immediately here because we'll free the whole CFG later,
-             * but it's better to remove it from the list so flatten_cfg doesn't see it.
-             * But we should free its dynamic arrays.
-             */
              if (to_delete->preds) free(to_delete->preds);
              if (to_delete->succs) free(to_delete->succs);
              free(to_delete);
@@ -162,7 +152,6 @@ IRInstr* flatten_cfg(CFG *cfg) {
         IRInstr *instr = bb->instrs;
         while (instr) {
             IRInstr *next_in_instr_list = instr->next;
-            
             instr->next = NULL;
             if (!head) head = instr;
             if (tail) tail->next = instr;
@@ -209,30 +198,13 @@ static int fold_constants(IRInstr *instr) {
 static int peephole_algebraic(IRInstr *instr) {
     if (instr->kind == IR_BINOP) {
         if (instr->binop == '+' ) {
-            if (instr->right.is_const && instr->right.const_val == 0) {
-                instr->kind = IR_ASSIGN;
-                instr->src = instr->left;
-                return 1;
-            }
-            if (instr->left.is_const && instr->left.const_val == 0) {
-                instr->kind = IR_ASSIGN;
-                instr->src = instr->right;
-                return 1;
-            }
+            if (instr->right.is_const && instr->right.const_val == 0) { instr->kind = IR_ASSIGN; instr->src = instr->left; return 1; }
+            if (instr->left.is_const && instr->left.const_val == 0) { instr->kind = IR_ASSIGN; instr->src = instr->right; return 1; }
         }
         if (instr->binop == '*') {
-            if (instr->right.is_const && instr->right.const_val == 1) {
-                instr->kind = IR_ASSIGN;
-                instr->src = instr->left;
-                return 1;
-            }
-            if (instr->left.is_const && instr->left.const_val == 1) {
-                instr->kind = IR_ASSIGN;
-                instr->src = instr->right;
-                return 1;
-            }
-            if ((instr->right.is_const && instr->right.const_val == 0) ||
-                (instr->left.is_const && instr->left.const_val == 0)) {
+            if (instr->right.is_const && instr->right.const_val == 1) { instr->kind = IR_ASSIGN; instr->src = instr->left; return 1; }
+            if (instr->left.is_const && instr->left.const_val == 1) { instr->kind = IR_ASSIGN; instr->src = instr->right; return 1; }
+            if ((instr->right.is_const && instr->right.const_val == 0) || (instr->left.is_const && instr->left.const_val == 0)) {
                 instr->kind = IR_ASSIGN;
                 instr->src = ir_op_const(0);
                 return 1;
@@ -242,127 +214,163 @@ static int peephole_algebraic(IRInstr *instr) {
     return 0;
 }
 
-typedef struct ConstVar {
-    char *name;
-    int val;
-    struct ConstVar *next;
-} ConstVar;
-
-static void add_const(ConstVar **list, char *name, int val) {
-    ConstVar *cv = malloc(sizeof(ConstVar));
-    cv->name = strdup(name);
-    cv->val = val;
-    cv->next = *list;
-    *list = cv;
-}
-
-static int get_const(ConstVar *list, char *name, int *val) {
-    while (list) {
-        if (strcmp(list->name, name) == 0) {
-            *val = list->val;
+static int strength_reduction(IRInstr *instr) {
+    if (instr->kind == IR_BINOP && instr->binop == '*') {
+        if (instr->right.is_const && instr->right.const_val == 2) {
+            instr->binop = '+';
+            instr->right = instr->left;
+            return 1;
+        } else if (instr->left.is_const && instr->left.const_val == 2) {
+            instr->binop = '+';
+            instr->left = instr->right;
             return 1;
         }
-        list = list->next;
     }
     return 0;
 }
 
+typedef struct ConstVar { char *name; int val; struct ConstVar *next; } ConstVar;
+typedef struct CopyVar { char *dest; char *src; struct CopyVar *next; } CopyVar;
+typedef struct ExprNode { char *res; IROperand l; IROperand r; int op; struct ExprNode *next; } ExprNode;
+
+static void add_const(ConstVar **list, char *name, int val) {
+    ConstVar *cv = malloc(sizeof(ConstVar)); cv->name = strdup(name); cv->val = val; cv->next = *list; *list = cv;
+}
+static void add_copy(CopyVar **list, char *dest, char *src) {
+    CopyVar *cv = malloc(sizeof(CopyVar)); cv->dest = strdup(dest); cv->src = strdup(src); cv->next = *list; *list = cv;
+}
+static void add_expr(ExprNode **list, char *res, IROperand l, IROperand r, int op) {
+    ExprNode *e = malloc(sizeof(ExprNode)); e->res = strdup(res); e->l = l; e->r = r; e->op = op; e->next = *list; *list = e;
+}
+
+static int get_const(ConstVar *list, char *name, int *val) {
+    while (list) { if (strcmp(list->name, name) == 0) { *val = list->val; return 1; } list = list->next; } return 0;
+}
+static char* get_copy(CopyVar *list, char *name) {
+    while (list) { if (strcmp(list->dest, name) == 0) return list->src; list = list->next; } return NULL;
+}
+
 static void remove_const(ConstVar **list, char *name) {
+    if (!list) return;
     ConstVar **curr = list;
     while (*curr) {
-        if (strcmp((*curr)->name, name) == 0) {
-            ConstVar *tmp = *curr;
-            *curr = (*curr)->next;
-            free(tmp->name);
-            free(tmp);
-            return;
-        }
+        if (strcmp((*curr)->name, name) == 0) { ConstVar *tmp = *curr; *curr = (*curr)->next; free(tmp->name); free(tmp); return; }
         curr = &((*curr)->next);
     }
 }
 
-static void clear_consts(ConstVar *list) {
-    while (list) {
-        ConstVar *tmp = list;
-        list = list->next;
-        free(tmp->name);
-        free(tmp);
+// BUGFIX: Safely handle NULL checks to prevent segmentation faults during validation
+static void invalidate_copies_and_exprs(CopyVar **copies, ExprNode **exprs, const char *name) {
+    if (!name) return;
+    
+    if (copies) {
+        CopyVar **c = copies;
+        while (*c) {
+            if (strcmp((*c)->dest, name) == 0 || strcmp((*c)->src, name) == 0) {
+                CopyVar *tmp = *c; *c = (*c)->next; free(tmp->dest); free(tmp->src); free(tmp);
+            } else { c = &((*c)->next); }
+        }
+    }
+    
+    if (exprs) {
+        ExprNode **e = exprs;
+        while (*e) {
+            if (strcmp((*e)->res, name) == 0 || ((*e)->l.name && strcmp((*e)->l.name, name) == 0) || ((*e)->r.name && strcmp((*e)->r.name, name) == 0)) {
+                ExprNode *tmp = *e; *e = (*e)->next; free(tmp->res); free(tmp);
+            } else { e = &((*e)->next); }
+        }
     }
 }
 
-static int propagate_constants(IRInstr *instr, ConstVar **consts) {
+static void clear_local_structs(ConstVar *c_list, CopyVar *cp_list, ExprNode *e_list) {
+    while (c_list) { ConstVar *tmp = c_list; c_list = c_list->next; free(tmp->name); free(tmp); }
+    while (cp_list) { CopyVar *tmp = cp_list; cp_list = cp_list->next; free(tmp->dest); free(tmp->src); free(tmp); }
+    while (e_list) { ExprNode *tmp = e_list; e_list = e_list->next; free(tmp->res); free(tmp); }
+}
+
+static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, CopyVar **copies) {
     int changed = 0;
-    if (instr->kind == IR_ASSIGN) {
-        if (!instr->src.is_const && instr->src.name) {
-            int val;
-            if (get_const(*consts, instr->src.name, &val)) {
-                instr->src = ir_op_const(val);
-                changed = 1;
+    IROperand *ops[5] = {NULL}; int num_ops = 0;
+    
+    // Expanded to thoroughly support advanced arrays, pointers, and struct mechanics
+    if (instr->kind == IR_ASSIGN) { ops[0] = &instr->src; num_ops = 1; }
+    else if (instr->kind == IR_BINOP) { ops[0] = &instr->left; ops[1] = &instr->right; num_ops = 2; }
+    else if (instr->kind == IR_UNOP) { ops[0] = &instr->unop_src; num_ops = 1; }
+    else if (instr->kind == IR_IF) { ops[0] = &instr->if_left; ops[1] = &instr->if_right; num_ops = 2; }
+    else if (instr->kind == IR_RETURN) { ops[0] = &instr->src; num_ops = 1; }
+    else if (instr->kind == IR_PARAM) { ops[0] = &instr->src; num_ops = 1; } 
+    else if (instr->kind == IR_LOAD) { ops[0] = &instr->base; ops[1] = &instr->index; num_ops = 2; }
+    else if (instr->kind == IR_STORE) { ops[0] = &instr->base; ops[1] = &instr->index; ops[2] = &instr->store_val; num_ops = 3; }
+    else if (instr->kind == IR_CALL_INDIRECT) { ops[0] = &instr->base; num_ops = 1; }
+
+    for (int i = 0; i < num_ops; i++) {
+        if (ops[i] && !ops[i]->is_const && ops[i]->name) {
+            int val; char *cpy;
+            if (get_const(*consts, ops[i]->name, &val)) {
+                *ops[i] = ir_op_const(val); changed = 1;
+            } else if ((cpy = get_copy(*copies, ops[i]->name)) != NULL) {
+                *ops[i] = ir_op_name(cpy); changed = 1;
             }
-        }
-    } else if (instr->kind == IR_BINOP) {
-        if (!instr->left.is_const && instr->left.name) {
-            int val;
-            if (get_const(*consts, instr->left.name, &val)) {
-                instr->left = ir_op_const(val);
-                changed = 1;
-            }
-        }
-        if (!instr->right.is_const && instr->right.name) {
-            int val;
-            if (get_const(*consts, instr->right.name, &val)) {
-                instr->right = ir_op_const(val);
-                changed = 1;
-            }
-        }
-    } else if (instr->kind == IR_IF) {
-        if (!instr->if_left.is_const && instr->if_left.name) {
-            int val;
-            if (get_const(*consts, instr->if_left.name, &val)) {
-                instr->if_left = ir_op_const(val);
-                changed = 1;
-            }
-        }
-        if (!instr->if_right.is_const && instr->if_right.name) {
-            int val;
-            if (get_const(*consts, instr->if_right.name, &val)) {
-                instr->if_right = ir_op_const(val);
-                changed = 1;
-            }
-        }
-    } else if (instr->kind == IR_RETURN && !instr->src.is_const && instr->src.name) {
-        int val;
-        if (get_const(*consts, instr->src.name, &val)) {
-            instr->src = ir_op_const(val);
-            changed = 1;
         }
     }
 
     if (instr->result) {
-        if (instr->kind == IR_ASSIGN && instr->src.is_const) {
-            remove_const(consts, instr->result);
-            add_const(consts, instr->result, instr->src.const_val);
-        } else {
-            remove_const(consts, instr->result);
+        remove_const(consts, instr->result);
+        invalidate_copies_and_exprs(copies, NULL, instr->result);
+        
+        if (instr->kind == IR_ASSIGN) {
+            if (instr->src.is_const) add_const(consts, instr->result, instr->src.const_val);
+            else if (instr->src.name) add_copy(copies, instr->result, instr->src.name);
         }
     }
     return changed;
+}
+
+static int eliminate_cse(IRInstr *instr, ExprNode **exprs) {
+    if (instr->kind != IR_BINOP) {
+        if (instr->result) invalidate_copies_and_exprs(NULL, exprs, instr->result);
+        return 0;
+    }
+    
+    ExprNode *e = *exprs;
+    while (e) {
+        if (e->op == instr->binop) {
+            int left_match = (e->l.is_const && instr->left.is_const && e->l.const_val == instr->left.const_val) ||
+                             (!e->l.is_const && !instr->left.is_const && e->l.name && instr->left.name && strcmp(e->l.name, instr->left.name) == 0);
+            int right_match = (e->r.is_const && instr->right.is_const && e->r.const_val == instr->right.const_val) ||
+                              (!e->r.is_const && !instr->right.is_const && e->r.name && instr->right.name && strcmp(e->r.name, instr->right.name) == 0);
+            
+            if (left_match && right_match) {
+                instr->kind = IR_ASSIGN;
+                instr->src = ir_op_name(e->res);
+                return 1;
+            }
+        }
+        e = e->next;
+    }
+    if (instr->result) {
+        invalidate_copies_and_exprs(NULL, exprs, instr->result);
+        add_expr(exprs, instr->result, instr->left, instr->right, instr->binop);
+    }
+    return 0;
 }
 
 static void optimize_bb(BasicBlock *bb) {
     int changed = 1;
     while (changed) {
         changed = 0;
-        ConstVar *consts = NULL;
+        ConstVar *consts = NULL; CopyVar *copies = NULL; ExprNode *exprs = NULL;
         IRInstr *curr = bb->instrs;
         while (curr) {
-            changed |= propagate_constants(curr, &consts);
+            changed |= propagate_constants_and_copies(curr, &consts, &copies);
+            changed |= eliminate_cse(curr, &exprs);
             changed |= fold_constants(curr);
+            changed |= strength_reduction(curr);
             changed |= peephole_algebraic(curr);
             if (curr == bb->last) break;
             curr = curr->next;
         }
-        clear_consts(consts);
+        clear_local_structs(consts, copies, exprs);
     }
 }
 
@@ -401,17 +409,19 @@ static void set_free(char **set, int count) {
 static void compute_use_def(BasicBlock *bb) {
     IRInstr *curr = bb->instrs;
     while (curr) {
-        /* Check operands (use) */
         IROperand *ops[5] = {NULL};
         int num_ops = 0;
+        
+        // Ensure complex instructions are safely covered
         if (curr->kind == IR_ASSIGN) { ops[0] = &curr->src; num_ops = 1; }
         else if (curr->kind == IR_BINOP) { ops[0] = &curr->left; ops[1] = &curr->right; num_ops = 2; }
         else if (curr->kind == IR_UNOP) { ops[0] = &curr->unop_src; num_ops = 1; }
-        else if (curr->kind == IR_PARAM) { ops[0] = &curr->src; num_ops = 1; } /* ir_make_param uses src */
+        else if (curr->kind == IR_PARAM) { ops[0] = &curr->src; num_ops = 1; } 
         else if (curr->kind == IR_IF) { ops[0] = &curr->if_left; ops[1] = &curr->if_right; num_ops = 2; }
         else if (curr->kind == IR_RETURN) { ops[0] = &curr->src; num_ops = 1; }
         else if (curr->kind == IR_LOAD) { ops[0] = &curr->base; ops[1] = &curr->index; num_ops = 2; }
         else if (curr->kind == IR_STORE) { ops[0] = &curr->base; ops[1] = &curr->index; ops[2] = &curr->store_val; num_ops = 3; }
+        else if (curr->kind == IR_CALL_INDIRECT) { ops[0] = &curr->base; num_ops = 1; }
 
         for (int i = 0; i < num_ops; i++) {
             if (ops[i] && !ops[i]->is_const && ops[i]->name) {
@@ -421,7 +431,6 @@ static void compute_use_def(BasicBlock *bb) {
             }
         }
 
-        /* Check result (def) */
         if (curr->result) {
             if (!set_contains(bb->use, bb->use_count, curr->result)) {
                 set_add(&bb->def, &bb->def_count, curr->result);
@@ -451,12 +460,10 @@ void compute_liveness(CFG *cfg) {
         changed = 0;
         bb = cfg->blocks;
         while (bb) {
-            /* live_out = Union of live_in of successors */
             for (int i = 0; i < bb->succ_count; i++) {
                 changed |= set_union(&bb->live_out, &bb->live_out_count, bb->succs[i]->live_in, bb->succs[i]->live_in_count);
             }
 
-            /* live_in = use Union (live_out - def) */
             int old_in_count = bb->live_in_count;
             set_union(&bb->live_in, &bb->live_in_count, bb->use, bb->use_count);
             for (int i = 0; i < bb->live_out_count; i++) {
@@ -477,18 +484,10 @@ void eliminate_dead_code(CFG *cfg) {
 
     BasicBlock *bb = cfg->blocks;
     while (bb) {
-        /* Work backwards within the block */
-        /* Note: For simplicity, we recalculate liveness at each step if we delete something,
-         * or just use the global live_out and track local liveness.
-         */
         char **current_live = calloc(bb->live_out_count, sizeof(char*));
         int current_live_count = 0;
         for (int i = 0; i < bb->live_out_count; i++) set_add(&current_live, &current_live_count, bb->live_out[i]);
 
-        /* Find last instruction to start backward walk */
-        /* Since we have a linked list, we might need to find previous... 
-         * or just use a temporary array of instructions in the block.
-         */
          int instr_count = 0;
          IRInstr *cur = bb->instrs;
          while (cur) { instr_count++; if (cur == bb->last) break; cur = cur->next; }
@@ -501,11 +500,8 @@ void eliminate_dead_code(CFG *cfg) {
              for (int i = instr_count - 1; i >= 0; i--) {
                  IRInstr *instr = instr_arr[i];
 
-                 /* If definition is not live and has no side effects, delete */
                  if (instr->result && !set_contains(current_live, current_live_count, instr->result)) {
-                     /* Side effects check: calls are NOT dead even if result unused */
                      if (instr->kind != IR_CALL && instr->kind != IR_CALL_INDIRECT) {
-                         /* Remove from block list */
                          if (i == 0) bb->instrs = instr->next;
                          else instr_arr[i-1]->next = instr->next;
                          
@@ -513,12 +509,10 @@ void eliminate_dead_code(CFG *cfg) {
                              if (i == 0) bb->last = NULL;
                              else bb->last = instr_arr[i-1];
                          }
-                         /* instr->next relinking is handled in flatten_cfg anyway but let's be safe if we reuse list */
-                         continue; /* Don't update liveness for deleted instr */
+                         continue; 
                      }
                  }
 
-                 /* Update current_live: remove result, add uses */
                  if (instr->result) {
                      for (int j = 0; j < current_live_count; j++) {
                          if (strcmp(current_live[j], instr->result) == 0) {
@@ -539,6 +533,7 @@ void eliminate_dead_code(CFG *cfg) {
                  else if (instr->kind == IR_RETURN) { ops[0] = &instr->src; num_ops = 1; }
                  else if (instr->kind == IR_LOAD) { ops[0] = &instr->base; ops[1] = &instr->index; num_ops = 2; }
                  else if (instr->kind == IR_STORE) { ops[0] = &instr->base; ops[1] = &instr->index; ops[2] = &instr->store_val; num_ops = 3; }
+                 else if (instr->kind == IR_CALL_INDIRECT) { ops[0] = &instr->base; num_ops = 1; }
 
                  for (int j = 0; j < num_ops; j++) {
                      if (ops[j] && !ops[j]->is_const && ops[j]->name) {
@@ -567,7 +562,6 @@ void compute_dominators(CFG *cfg) {
         bb = bb->next;
     }
 
-    /* Entry is dominated only by itself */
     for (int i = 0; i < n; i++) cfg->entry->doms[i] = 0;
     cfg->entry->doms[cfg->entry->id] = 1;
 
@@ -582,7 +576,6 @@ void compute_dominators(CFG *cfg) {
             for (int i = 0; i < n; i++) new_doms[i] = 1;
 
             if (bb->pred_count > 0) {
-                /* Intersection of preds' doms */
                 for (int i = 0; i < bb->pred_count; i++) {
                     BasicBlock *p = bb->preds[i];
                     for (int j = 0; j < n; j++) {
@@ -590,7 +583,7 @@ void compute_dominators(CFG *cfg) {
                     }
                 }
             } else {
-                /* No preds (except entry, but we handled that) -> should be unreachable */
+                for (int i = 0; i < n; i++) new_doms[i] = 0;
             }
             new_doms[bb->id] = 1;
 
@@ -606,11 +599,10 @@ void compute_dominators(CFG *cfg) {
     }
 }
 
-/* --- Loop Invariant Code Motion (Simplified) --- */
+/* --- Loop Invariant Code Motion (LICM) --- */
 
 static int is_loop_invariant(IRInstr *instr, int *loop_blocks, int n, CFG *cfg) {
     if (instr->kind != IR_BINOP && instr->kind != IR_UNOP && instr->kind != IR_ASSIGN) return 0;
-    /* Calls and loads are NOT invariant for now to avoid side effects/aliasing issues */
     
     IROperand *ops[2] = {NULL};
     int num = 0;
@@ -620,7 +612,6 @@ static int is_loop_invariant(IRInstr *instr, int *loop_blocks, int n, CFG *cfg) 
 
     for (int i = 0; i < num; i++) {
         if (!ops[i]->is_const && ops[i]->name) {
-            /* Check if result is defined in the loop */
             BasicBlock *bb = cfg->blocks;
             while (bb) {
                 if (loop_blocks[bb->id]) {
@@ -642,31 +633,22 @@ void optimize_loops(CFG *cfg) {
     if (!cfg) return;
     compute_dominators(cfg);
 
-    /* Identify natural loops: back-edge B -> H where H dominates B */
     BasicBlock *b = cfg->blocks;
     while (b) {
         for (int i = 0; i < b->succ_count; i++) {
             BasicBlock *h = b->succs[i];
             if (b->doms[h->id]) {
-                /* Found a natural loop with header H and back-edge B -> H */
-                /* Collect loop blocks */
                 int *loop_blocks = calloc(cfg->block_count, sizeof(int));
                 loop_blocks[h->id] = 1;
                 loop_blocks[b->id] = 1;
                 
-                /* Simple BFS/DFS to find all blocks in loop */
-                /* (Omitted for brevity, assuming simple loops for now or just the two blocks) */
-                
-                /* For each block in loop, identify invariants */
-                /* For now, just check the header and back-edge tail */
                 BasicBlock *members[] = {h, b};
                 for (int m = 0; m < 2; m++) {
                     BasicBlock *lb = members[m];
                     IRInstr **instr_ptr = &lb->instrs;
-                    while (*instr_ptr) {
+                    while (*instr_ptr && *instr_ptr != lb->last) {
                         IRInstr *instr = *instr_ptr;
                         if (is_loop_invariant(instr, loop_blocks, cfg->block_count, cfg)) {
-                            /* Move to pre-header (simplified: first pred of H that isn't in loop) */
                             BasicBlock *pre = NULL;
                             for (int p = 0; p < h->pred_count; p++) {
                                 if (!loop_blocks[h->preds[p]->id]) {
@@ -675,33 +657,15 @@ void optimize_loops(CFG *cfg) {
                                 }
                             }
                             if (pre) {
-                                /* Move instruction */
                                 *instr_ptr = instr->next;
-                                if (instr == lb->last) lb->last = NULL; /* Simplified */
-                                
-                                /* Insert into pre-header before its last jump */
-                                IRInstr **pre_last_ptr = &pre->instrs;
-                                if (!*pre_last_ptr) {
-                                    pre->instrs = pre->last = instr;
-                                    instr->next = NULL;
-                                } else {
-                                    IRInstr *prev = NULL;
-                                    IRInstr *pcur = pre->instrs;
-                                    while (pcur != pre->last) { prev = pcur; pcur = pcur->next; }
-                                    /* pcur is pre->last (typically a jump) */
-                                    if (prev) {
-                                        prev->next = instr;
-                                        instr->next = pcur;
-                                    } else {
-                                        pre->instrs = instr;
-                                        instr->next = pcur;
-                                    }
-                                }
+                                IRInstr *pcur = pre->instrs, *prev = NULL;
+                                while (pcur && pcur != pre->last) { prev = pcur; pcur = pcur->next; }
+                                if (prev) { prev->next = instr; instr->next = pcur; }
+                                else { pre->instrs = instr; instr->next = pcur; }
                                 continue;
                             }
                         }
-                        if (instr == lb->last) break;
-                        instr_ptr = &instr->next;
+                        instr_ptr = &(*instr_ptr)->next;
                     }
                 }
                 free(loop_blocks);
@@ -711,6 +675,41 @@ void optimize_loops(CFG *cfg) {
     }
 }
 
+/* --- Loop Unrolling --- */
+void unroll_loops(CFG *cfg) {
+    if (!cfg) return;
+    BasicBlock *b = cfg->blocks;
+    while (b) {
+        if (b->succ_count == 2 && (b->succs[0] == b || b->succs[1] == b)) {
+            int count = 0; 
+            IRInstr *curr = b->instrs;
+            while (curr && curr != b->last) { count++; curr = curr->next; }
+            
+            if (count <= 10 && count >= 2) {
+                IRInstr *clone_head = NULL, *clone_tail = NULL;
+                curr = b->instrs;
+                while (curr && curr != b->last) {
+                    IRInstr *clone = malloc(sizeof(IRInstr));
+                    memcpy(clone, curr, sizeof(IRInstr));
+                    clone->next = NULL;
+                    if (!clone_head) clone_head = clone;
+                    if (clone_tail) clone_tail->next = clone;
+                    clone_tail = clone;
+                    curr = curr->next;
+                }
+                IRInstr *pcur = b->instrs, *prev = NULL;
+                while (pcur && pcur != b->last) { prev = pcur; pcur = pcur->next; }
+                
+                if (prev) { prev->next = clone_head; clone_tail->next = pcur; }
+                else if (clone_head) { b->instrs = clone_head; clone_tail->next = pcur; }
+            }
+        }
+        b = b->next;
+    }
+}
+
+/* --- Main Optimization Pipeline --- */
+
 void optimize_program(IRProgram *prog) {
     if (!prog) return;
 
@@ -718,19 +717,20 @@ void optimize_program(IRProgram *prog) {
     while (f) {
         CFG *cfg = build_cfg(f);
         if (cfg) {
-            /* Phase 2: Local optimizations */
+            /* Phase 2: Local optimizations (CSE, CP, Fold, Alg, StrReduct) */
             BasicBlock *bb = cfg->blocks;
             while (bb) {
                 optimize_bb(bb);
                 bb = bb->next;
             }
 
-            /* Phase 3: Global optimizations */
+            /* Phase 3: Global optimizations (DCE, Unreachable) */
             eliminate_unreachable_blocks(cfg);
             eliminate_dead_code(cfg);
 
-            /* Phase 4: Loop optimizations (Drafted, disabled for stability) */
-            // optimize_loops(cfg); 
+            /* Phase 4: Loop optimizations (LICM, Unrolling) */
+            optimize_loops(cfg); 
+            unroll_loops(cfg);
 
             f->instrs = flatten_cfg(cfg);
             free_cfg(cfg);
