@@ -7,6 +7,7 @@
 #include "semantic.h"
 #include "ir_gen.h"
 #include "ir_opt.h"
+#include "riscv_gen.h"
 
 void print_vtables() {
     Scope *global = current_scope;
@@ -724,19 +725,20 @@ int main(int argc, char **argv) {
         {
           print_symbol_table();
           printf("Semantic analysis successful.\n");
-          /* Week 4: IR generation */
+
           IRProgram *ir = ir_generate(root);
           if (ir) {
             ir_print_program(ir);
             print_vtables();
             ir_export_to_file(ir, "ir.txt");
-            
-            /* Optimization pass */
+
             printf("Optimizing IR...\n");
             optimize_program(ir);
             printf("Optimization complete. Optimized IR printed below:\n");
             ir_print_program(ir);
             ir_export_to_file(ir, "ir_opt.txt");
+
+            riscv_generate(ir, "output.s");
 
             ir_free_program(ir);
           }

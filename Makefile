@@ -1,5 +1,4 @@
 CC = gcc
-# search build directory first so generated headers are used
 CFLAGS = -Wall -g -I./build -I./src
 BISON = bison
 FLEX = flex
@@ -15,7 +14,9 @@ OBJS = $(BUILD_DIR)/y.tab.o \
        $(BUILD_DIR)/semantic.o \
        $(BUILD_DIR)/ir.o \
        $(BUILD_DIR)/ir_gen.o \
-       $(BUILD_DIR)/ir_opt.o
+       $(BUILD_DIR)/ir_opt.o \
+       $(BUILD_DIR)/riscv_gen.o
+#        $(BUILD_DIR)/ir_opt.o
 
 all: setup parser
 
@@ -28,8 +29,6 @@ parser: $(OBJS)
 
 $(BUILD_DIR)/y.tab.c $(BUILD_DIR)/y.tab.h: $(SRC_DIR)/parser.y
 	$(BISON) -t -d -o $(BUILD_DIR)/y.tab.c $(SRC_DIR)/parser.y
-	# keep a copy of header in src so other tools can access it (make include path handles build first)
-	cp $(BUILD_DIR)/y.tab.h $(SRC_DIR)/y.tab.h
 
 $(BUILD_DIR)/lex.yy.c: $(SRC_DIR)/lexer.l $(BUILD_DIR)/y.tab.h
 	$(FLEX) -o $(BUILD_DIR)/lex.yy.c $(SRC_DIR)/lexer.l
@@ -44,4 +43,4 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) ast.dot ir.txt
+	rm -rf $(BUILD_DIR) ast.dot ir.txt ir_opt.txt output.s

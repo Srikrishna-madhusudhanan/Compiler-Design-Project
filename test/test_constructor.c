@@ -2,7 +2,8 @@ class Stack {
     private:
      //int secret;
     public:
-    int top;
+        int top;
+        
     Stack() {
         top = 0;
     }
