@@ -325,6 +325,7 @@ void analyze_function(ASTNode *node) {
     if (count > 0) {
         func->param_types = malloc(sizeof(DataType) * count);
         func->param_is_array = malloc(sizeof(int) * count);
+        func->param_names = malloc(sizeof(char*) * count);
     }
 
     param = node->params;
@@ -332,6 +333,7 @@ void analyze_function(ASTNode *node) {
     while (param) {
         func->param_types[i] = param->left->data_type;
         func->param_is_array[i] = (param->int_val != 0);
+        func->param_names[i] = strdup(param->str_val);
         param = param->next;
         i++;
     }

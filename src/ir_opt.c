@@ -454,12 +454,16 @@ static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, Cop
     
     if (instr->kind == IR_ASSIGN) { ops[0] = &instr->src; num_ops = 1; }
     else if (instr->kind == IR_BINOP) { ops[0] = &instr->left; ops[1] = &instr->right; num_ops = 2; }
-    else if (instr->kind == IR_UNOP) { ops[0] = &instr->unop_src; num_ops = 1; }
+    else if (instr->kind == IR_UNOP) { 
+        /* Only propagate into unary operators that DO NOT take the address */
+        if (instr->unop != '&') { ops[0] = &instr->unop_src; num_ops = 1; }
+    }
     else if (instr->kind == IR_IF) { ops[0] = &instr->if_left; ops[1] = &instr->if_right; num_ops = 2; }
     else if (instr->kind == IR_RETURN) { ops[0] = &instr->src; num_ops = 1; }
     else if (instr->kind == IR_PARAM) { ops[0] = &instr->src; num_ops = 1; } 
     else if (instr->kind == IR_LOAD) { ops[0] = &instr->base; ops[1] = &instr->index; num_ops = 2; }
     else if (instr->kind == IR_STORE) { ops[0] = &instr->base; ops[1] = &instr->index; ops[2] = &instr->store_val; num_ops = 3; }
+    else if (instr->kind == IR_ALLOCA) { ops[0] = &instr->src; num_ops = 1; }
     else if (instr->kind == IR_CALL_INDIRECT) { ops[0] = &instr->base; num_ops = 1; }
 
     for (int i = 0; i < num_ops; i++) {
@@ -484,6 +488,24 @@ static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, Cop
             else if (instr->src.name) add_copy(copies, instr->result, instr->src.name);
         }
     }
+
+    /* Side Effect: If we take the address of a variable, it escapes.
+     * We must stop tracking any constant or copy for it. */
+    if (instr->kind == IR_UNOP && instr->unop == '&') {
+        if (instr->unop_src.name) {
+            remove_const(consts, instr->unop_src.name);
+            invalidate_copies_and_exprs(copies, NULL, instr->unop_src.name);
+        }
+    }
+
+    /* Side Effect: Any function call might modify any variable that has escaped 
+     * (or any global). To be safe, clear all constants and copies. */
+    if (instr->kind == IR_CALL || instr->kind == IR_CALL_INDIRECT) {
+        clear_local_structs(*consts, *copies, NULL);
+        *consts = NULL;
+        *copies = NULL;
+    }
+
     return changed;
 }
 
@@ -517,7 +539,11 @@ static int eliminate_cse(IRInstr *instr, ExprNode **exprs) {
 }
 
 typedef struct StoreRecord { 
-    char *base;  char *index; struct StoreRecord *next; 
+    char *base;  
+    char *index; 
+    int has_const_index;
+    int const_index_val;
+    struct StoreRecord *next; 
 } StoreRecord;
 
 static void eliminate_dead_stores_local(BasicBlock *bb) {
@@ -540,10 +566,17 @@ static void eliminate_dead_stores_local(BasicBlock *bb) {
             int is_dead = 0;
             StoreRecord *s = stores;
             while (s) {
-                if (s->base && instr->base.name && strcmp(s->base, instr->base.name) == 0 &&
-                    ((instr->index.is_const && s->index == NULL) || 
-                     (!instr->index.is_const && s->index && instr->index.name && strcmp(s->index, instr->index.name) == 0))) {
-                    is_dead = 1; break;
+                if (s->base && instr->base.name && strcmp(s->base, instr->base.name) == 0) {
+                    /* Base array matches. Check indices. */
+                    if (instr->index.is_const && s->has_const_index) {
+                        if (instr->index.const_val == s->const_index_val) {
+                            is_dead = 1; break;
+                        }
+                    } else if (!instr->index.is_const && !s->has_const_index &&
+                               instr->index.name && s->index && 
+                               strcmp(instr->index.name, s->index) == 0) {
+                        is_dead = 1; break;
+                    }
                 }
                 s = s->next;
             }
@@ -554,6 +587,8 @@ static void eliminate_dead_stores_local(BasicBlock *bb) {
             } else {
                 StoreRecord *ns = malloc(sizeof(StoreRecord));
                 ns->base = instr->base.name ? strdup(instr->base.name) : NULL;
+                ns->has_const_index = instr->index.is_const;
+                ns->const_index_val = instr->index.is_const ? instr->index.const_val : 0;
                 ns->index = (instr->index.is_const || !instr->index.name) ? NULL : strdup(instr->index.name);
                 ns->next = stores;
                 stores = ns;
@@ -673,6 +708,7 @@ static void compute_use_def(BasicBlock *bb) {
         else if (curr->kind == IR_RETURN) { ops[0] = &curr->src; num_ops = 1; }
         else if (curr->kind == IR_LOAD) { ops[0] = &curr->base; ops[1] = &curr->index; num_ops = 2; }
         else if (curr->kind == IR_STORE) { ops[0] = &curr->base; ops[1] = &curr->index; ops[2] = &curr->store_val; num_ops = 3; }
+        else if (curr->kind == IR_ALLOCA) { ops[0] = &curr->src; num_ops = 1; }
         else if (curr->kind == IR_CALL_INDIRECT) { ops[0] = &curr->base; num_ops = 1; }
 
         for (int i = 0; i < num_ops; i++) {
@@ -777,6 +813,7 @@ void eliminate_dead_code(CFG *cfg) {
                  else if (instr->kind == IR_RETURN) { ops[0] = &instr->src; num_ops = 1; }
                  else if (instr->kind == IR_LOAD) { ops[0] = &instr->base; ops[1] = &instr->index; num_ops = 2; }
                  else if (instr->kind == IR_STORE) { ops[0] = &instr->base; ops[1] = &instr->index; ops[2] = &instr->store_val; num_ops = 3; }
+                 else if (instr->kind == IR_ALLOCA) { ops[0] = &instr->src; num_ops = 1; }
                  else if (instr->kind == IR_CALL_INDIRECT) { ops[0] = &instr->base; num_ops = 1; }
 
                  for (int j = 0; j < num_ops; j++) {

@@ -2,33 +2,47 @@ Parsing...
 
 =========== SYMBOL TABLE ===========
 Scope Level: 2
-Name: x          | Type: int    | Kind: variable  | Line: 2 | Scope: 2 | Offset: -4
-Name: y          | Type: int    | Kind: variable  | Line: 3 | Scope: 2 | Offset: -8
+Name: result     | Type: int    | Kind: variable  | Line: 10 | Scope: 2 | Offset: -4
 ------------------------------------
 Scope Level: 1
 ------------------------------------
+Scope Level: 3
+------------------------------------
+Scope Level: 2
+------------------------------------
+Scope Level: 1
+Name: n          | Type: int    | Kind: parameter | Line: 1 | Scope: 1 | Offset: 16
+------------------------------------
 Scope Level: 0
-Name: main       | Type: int    | Kind: function  | Line: 9 | Scope: 0 | Offset: 0 | L_Size: 8
+Name: main       | Type: int    | Kind: function  | Line: 13 | Scope: 0 | Offset: 0 | L_Size: 4
+Name: fact       | Type: int    | Kind: function  | Line: 7 | Scope: 0 | Offset: 0 | L_Size: 0
 ------------------------------------
 ====================================
 Semantic analysis successful.
 
 =========== IR (Three-Address Code) ===========
 function main:
-  x := 42
+  param 7
+  t0 := call fact, 1
+  result := t0
   param .LC0
-  param x
-  call printf, 2
-  param .LC1
-  call printf, 1
-  param .LC2
-  t0 = &y
-  param t0
-  call scanf, 2
-  param .LC3
-  param y
+  param result
   call printf, 2
   return 0
+
+function fact:
+  if n != 0 goto L3
+  goto L2
+L3:
+  goto L0
+L0:
+  return 1
+L2:
+  t0 := n - 1
+  param t0
+  t1 := call fact, 1
+  t2 := n * t1
+  return t2
 
 ===============================================
 Optimizing IR...
@@ -36,57 +50,77 @@ Optimization complete. Optimized IR printed below:
 
 =========== IR (Three-Address Code) ===========
 function main:
+  param 7
+  t0 := call fact, 1
   param .LC0
-  param 42
-  call printf, 2
-  param .LC1
-  call printf, 1
-  param .LC2
-  t0 = &y
   param t0
-  call scanf, 2
-  param .LC3
-  param y
   call printf, 2
   return 0
+
+function fact:
+  if n == 0 goto L2
+L3:
+  return 1
+L2:
+  t0 := n - 1
+  param t0
+  t1 := call fact, 1
+  t2 := n * t1
+  return t2
 
 ===============================================
 Running register allocation...
 [reg_alloc] Interference graph written to main_interference.dot
+[reg_alloc] Interference graph written to fact_interference.dot
 Register allocation complete.
 Parsing Done with 0 errors
 AST Structure:
+FunctionDef: fact
+  Return Type:
+    Type (token 258)
+  Params:
+    Param: n
+      Type:
+        Type (token 258)
+  Body:
+    Block
+      If
+        Cond:
+          BinOp: &&
+            Var: n
+            Int: 1
+        Then:
+          Block
+            Return
+              Int: 1
+      Return
+        BinOp: *
+          Var: n
+          FuncCall: fact
+            Callee:
+              Var: fact
+            Args:
+              BinOp: -
+                Var: n
+                Int: 1
 FunctionDef: main
   Return Type:
     Type (token 258)
   Params:
   Body:
     Block
-      VarDecl: x
+      VarDecl: result
         Type (token 258)
         Initializer:
-          Int: 42
-      VarDecl: y
-        Type (token 258)
+          FuncCall: fact
+            Callee:
+              Var: fact
+            Args:
+              Int: 7
       Printf
         Format:
-          String: "The value of x is %d\n"
+          String: "Recursive Factorial is %d\n"
         Args:
-          Var: x
-      Printf
-        Format:
-          String: "Please enter a value for y: "
-        Args:
-      Scanf
-        Format:
-          String: "%d"
-        Args:
-          UnOp: &
-            Var: y
-      Printf
-        Format:
-          String: "You entered %d\n"
-        Args:
-          Var: y
+          Var: result
       Return
         Int: 0

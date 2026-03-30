@@ -124,6 +124,18 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
     /* Ensure liveness info is up to date */
     compute_liveness(cfg);
 
+    /* --- Parameters interfere with each other at function entry --- */
+    Symbol *fsym = lookup(f->name);
+    if (fsym && fsym->kind == SYM_FUNCTION) {
+        for (int i = 0; i < fsym->param_count; i++) {
+            for (int j = i + 1; j < fsym->param_count; j++) {
+                int u = ig_get_or_add(ig, fsym->param_names[i]);
+                int v = ig_get_or_add(ig, fsym->param_names[j]);
+                ig_add_edge(ig, u, v);
+            }
+        }
+    }
+
     /* Walk each basic block */
     BasicBlock *bb = cfg->blocks;
     while (bb) {
@@ -199,6 +211,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
                                        ops[nops++] = &instr->index;
                                        ops[nops++] = &instr->store_val; break;
                 case IR_CALL_INDIRECT: ops[nops++] = &instr->base; break;
+                case IR_ALLOCA:        ops[nops++] = &instr->src; break;
                 default: break;
             }
             for (int j = 0; j < nops; j++) {
@@ -427,6 +440,7 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
                                        use_ops[n_use++] = &instr->index;
                                        use_ops[n_use++] = &instr->store_val; break;
                 case IR_CALL_INDIRECT: use_ops[n_use++] = &instr->base; break;
+                case IR_ALLOCA:        use_ops[n_use++] = &instr->src; break;
                 default: break;
             }
 
@@ -519,7 +533,7 @@ static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name
 static RegAllocResult *allocate_function(IRFunc *f) {
     /* Spill slot counter: starts at -2048 (below the fixed frame area)
      * Each spill occupies 4 bytes. */
-    int spill_offset_base = -2052; /* starting just below the 2048-byte frame */
+    int spill_offset_base = -512; /* Starting below the typical local area; riscv_gen will adjust frame size */
 
     InterferenceGraph *ig   = NULL;
     RegAllocResult    *res  = NULL;

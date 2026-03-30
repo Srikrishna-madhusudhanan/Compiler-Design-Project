@@ -78,6 +78,7 @@ typedef struct Symbol {
      *   (e.g., declared as T a[]).
      */
     int *param_is_array;
+    char **param_names;
 
     // For functions: virtual flag
     int is_virtual;

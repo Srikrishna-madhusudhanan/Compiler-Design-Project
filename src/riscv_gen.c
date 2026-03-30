@@ -31,6 +31,7 @@ static VarOffset var_offsets[256];
 static int var_count = 0;
 static int current_temp_offset = 0;
 static int param_idx = 0;
+static RegAllocResult *cur_ra = NULL; /* NULL when running without allocator */
 
 static void reset_offsets(int locals_size) {
     var_count = 0;
@@ -43,10 +44,29 @@ static void reset_offsets(int locals_size) {
  * We add -32 to locals from the symbol table to skip the saved register area (ra, s0, s1-s4).
  */
 static int get_offset(const char *name) {
-    Symbol *sym = lookup((char *)name);
-    if (sym && sym->kind != SYM_FUNCTION && sym->kind != SYM_STRUCT)
-        return sym->frame_offset - 32;
+    /* 1. Check Register Allocator SPILLS or TEMPS */
+    if (cur_ra) {
+        int spill = reg_alloc_spill_offset(cur_ra, name);
+        if (spill != 0) return spill;
+    }
 
+    /* 2. Check Symbol Table (for variables with address taken, etc.) */
+    Symbol *sym = lookup((char *)name);
+    if (sym && sym->kind != SYM_FUNCTION && sym->kind != SYM_STRUCT) {
+        /* Find saved_regs_size to correctly offset locals from the frame pointer */
+        int callee_saves_count = 0;
+        if (cur_ra) {
+            for (int i = 0; i < RA_NUM_REGS; i++) {
+                if (cur_ra->callee_used[i]) callee_saves_count++;
+            }
+        }
+        int saved_regs_size = 8 + (callee_saves_count * 4);
+        /* sym->frame_offset is negative (e.g., -4, -8). 
+           We place it below the saved registers area. */
+        return sym->frame_offset - saved_regs_size;
+    }
+    
+    /* 3. Fallback for manually managed temps in this module */
     for (int i = 0; i < var_count; i++) {
         if (strcmp(var_offsets[i].name, name) == 0) return var_offsets[i].offset;
     }
@@ -64,7 +84,6 @@ static int get_offset(const char *name) {
 /* -----------------------------------------------------------------------
  * Per-function register allocation lookup (set before generating a function).
  * ----------------------------------------------------------------------- */
-static RegAllocResult *cur_ra = NULL; /* NULL when running without allocator */
 
 /*
  * Get the physical register name for a variable, or NULL if spilled/unknown.
@@ -191,10 +210,23 @@ static int calculate_frame_size(IRFunc *func, RegAllocResult *ra) {
         }
     }
 
-    /* 8 bytes for ra/s0 + callee saves + local variables */
-    int total = 8 + (callee_saves_count * 4) + locals_size;
-    /* Align to 16 bytes */
-    return (total + 15) & ~15;
+    /* Standard fixed frame part */
+    int saved_regs_size = 8 + (callee_saves_count * 4);
+    int max_fixed_offset = saved_regs_size + locals_size;
+
+    /* Scan allocator spills for even deeper offsets */
+    if (ra) {
+        for (int i = 0; i < ra->var_count; i++) {
+            if (ra->reg_index[i] < 0) {
+                int off = -ra->spill_offset[i];
+                if (off > max_fixed_offset) max_fixed_offset = off;
+            }
+        }
+    }
+
+    /* Ensure we cover the fallback temp area if any were assigned (conservative) */
+    /* Align to 16 bytes for RISC-V ABI compliance */
+    return (max_fixed_offset + 31) & ~15;
 }
 
 /* -----------------------------------------------------------------------
@@ -242,6 +274,27 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
         fprintf(out, "  sw s0, %d(sp)\n", frame_size - 8);
         emit_callee_saves(out, cur_ra, frame_size);
         fprintf(out, "  addi s0, sp, %d\n\n", frame_size);
+ 
+        /* --- Move parameters from a0-a7 to assigned locations --- */
+        if (fsym && fsym->kind == SYM_FUNCTION) {
+            for (int i = 0; i < fsym->param_count && i < 8; i++) {
+                char arg_reg[4];
+                snprintf(arg_reg, sizeof(arg_reg), "a%d", i);
+                const char *var_name = fsym->param_names[i];
+                const char *assigned_reg = reg_alloc_lookup(cur_ra, var_name);
+                
+                if (assigned_reg) {
+                    if (strcmp(arg_reg, assigned_reg) != 0) {
+                        fprintf(out, "  # Move param %s from %s to %s\n", var_name, arg_reg, assigned_reg);
+                        fprintf(out, "  mv %s, %s\n", assigned_reg, arg_reg);
+                    }
+                } else {
+                    /* Not in register, must be on stack (local variable area) */
+                    fprintf(out, "  # Store param %s from %s to stack\n", var_name, arg_reg);
+                    store_result(out, var_name, arg_reg);
+                }
+            }
+        }
 
         /* --- Instruction emission --- */
         IRInstr *instr = func->instrs;
@@ -367,6 +420,10 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     fprintf(out, "return\n");
                     if (instr->src.name || instr->src.is_const)
                         load_operand(out, instr->src, "a0");
+                    
+                    /* Restore Callee-Saves and Frame Pointers */
+                    /* Re-adjust sp to fixed frame start in case of VLA */
+                    fprintf(out, "  addi sp, s0, -%d\n", frame_size);
                     emit_callee_restores(out, cur_ra, frame_size);
                     fprintf(out, "  lw ra, %d(sp)\n", frame_size - 4);
                     fprintf(out, "  lw s0, %d(sp)\n", frame_size - 8);
@@ -383,6 +440,7 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
 
         /* --- Default epilogue (reached only if no explicit return) --- */
         fprintf(out, "\n  # --- Default Epilogue ---\n");
+        fprintf(out, "  addi sp, s0, -%d\n", frame_size);
         emit_callee_restores(out, cur_ra, frame_size);
         fprintf(out, "  lw ra, %d(sp)\n", frame_size - 4);
         fprintf(out, "  lw s0, %d(sp)\n", frame_size - 8);

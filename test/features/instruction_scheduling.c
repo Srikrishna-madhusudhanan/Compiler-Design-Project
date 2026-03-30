@@ -9,5 +9,6 @@ int main() {
     e = 30 + 40;
     f = d + e;
     g = b + c;
+    printf("g = %d\n", g);
     return f + g;
 }

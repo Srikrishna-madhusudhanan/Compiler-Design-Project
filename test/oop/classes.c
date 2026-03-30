@@ -2,6 +2,7 @@ class Base {
     public:
     int pub_x;
     virtual void func(class Base this) {
+        printf("I am Base\n");
     }
     private:
     int priv_x;
@@ -11,6 +12,7 @@ class Derived : Base {
     public:
     int derived_x;
     void func(class Derived this) {
+        printf("I am Derived\n");
     }
 };
 
