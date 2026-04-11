@@ -346,6 +346,9 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
         }
 
         case NODE_VAR:
+            if (node->sym && node->sym->has_const_value && !node->sym->is_address_taken) {
+                return ir_op_const(node->sym->const_value);
+            }
             return ir_op_name(get_ir_name(node));
         case NODE_INDEX: {
             return gen_index_expr(node, list, line);
@@ -522,18 +525,18 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
             int is_method = (node->left->type == NODE_MEMBER_ACCESS);
             
             IROperand obj_op = {0};
+            IROperand ops[32];
 
-            if (is_method && arg) {
+            if (is_method && arg && nargs < 32) {
                 /* Evaluate 'this' pointer */
                 obj_op = gen_expr(arg, list);
-                ir_append(list, ir_make_param(obj_op, line));
-                nargs++;
+                ops[nargs++] = obj_op;
                 arg = arg->next;
             }
 
             if (is_virtual) {
                 char *vtable_temp = ir_new_temp();
-                ir_append(list, ir_make_load(vtable_temp, obj_op, ir_op_const(0), 8, line));
+                ir_append(list, ir_make_load(vtable_temp, ops[0], ir_op_const(0), 8, line));
                 
                 int idx = node->func_sym ? node->func_sym->vtable_index : 0;
                 char *func_temp = ir_new_temp();
@@ -552,12 +555,14 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
             }
 
             /* Emit remaining params */
-            while (arg) {
-                IROperand a = gen_expr(arg, list);
-                ir_append(list, ir_make_param(a, line));
-                if (a.name) free(a.name);
-                nargs++;
+            while (arg && nargs < 32) {
+                ops[nargs++] = gen_expr(arg, list);
                 arg = arg->next;
+            }
+
+            for (int i = 0; i < nargs; i++) {
+                ir_append(list, ir_make_param(ops[i], line));
+                if (ops[i].name) free(ops[i].name);
             }
 
             /* Call */
@@ -584,7 +589,6 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
                 }
             }
 
-            if (obj_op.name) free(obj_op.name);
             ir_free_operand(&func_ptr_op);
             return res_op;
         }
@@ -918,44 +922,40 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
 
         case NODE_PRINTF: {
             int nargs = 0;
-            // Format string
-            IROperand fmt = gen_expr(node->left, list);
-            ir_append(list, ir_make_param(fmt, line));
-            nargs++;
-            if (fmt.name) free(fmt.name);
+            IROperand ops[32];
+            ops[nargs++] = gen_expr(node->left, list);
 
             // Arguments
             ASTNode *arg = node->right;
-            while (arg) {
-                IROperand a = gen_expr(arg, list);
-                ir_append(list, ir_make_param(a, line));
-                if (a.name) free(a.name);
-                nargs++;
+            while (arg && nargs < 32) {
+                ops[nargs++] = gen_expr(arg, list);
                 arg = arg->next;
             }
 
+            for (int i = 0; i < nargs; i++) {
+                ir_append(list, ir_make_param(ops[i], line));
+                if (ops[i].name) free(ops[i].name);
+            }
             ir_append(list, ir_make_call_void("printf", nargs, line));
             break;
         }
 
         case NODE_SCANF: {
             int nargs = 0;
-            // Format string
-            IROperand fmt = gen_expr(node->left, list);
-            ir_append(list, ir_make_param(fmt, line));
-            nargs++;
-            if (fmt.name) free(fmt.name);
+            IROperand ops[32];
+            ops[nargs++] = gen_expr(node->left, list);
 
             // Arguments
             ASTNode *arg = node->right;
-            while (arg) {
-                IROperand a = gen_expr(arg, list);
-                ir_append(list, ir_make_param(a, line));
-                if (a.name) free(a.name);
-                nargs++;
+            while (arg && nargs < 32) {
+                ops[nargs++] = gen_expr(arg, list);
                 arg = arg->next;
             }
 
+            for (int i = 0; i < nargs; i++) {
+                ir_append(list, ir_make_param(ops[i], line));
+                if (ops[i].name) free(ops[i].name);
+            }
             ir_append(list, ir_make_call_void("scanf", nargs, line));
             break;
         }

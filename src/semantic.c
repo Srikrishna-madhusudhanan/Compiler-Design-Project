@@ -459,6 +459,8 @@ void analyze_declaration(ASTNode *node) {
     current_local_offset += size;
     sym->frame_offset = -current_local_offset;
 
+    sym->is_const = node->is_const;
+
     if (!insert_symbol(sym))
         semantic_error(node->line_number, "Variable redeclared");
     
@@ -470,8 +472,10 @@ void analyze_declaration(ASTNode *node) {
             semantic_error(node->line_number, "Type mismatch in initialization");
         
         if (node->right->type == NODE_CONST_INT) {
-            sym->has_const_value = 1;
-            sym->const_value = node->right->int_val;
+            if (sym->is_const) {
+                sym->has_const_value = 1;
+                sym->const_value = node->right->int_val;
+            }
         }
     }
 }
@@ -600,6 +604,10 @@ void analyze_assignment(ASTNode *node) {
         return;
     }
 
+    if (node->left->sym && node->left->sym->is_const) {
+        semantic_error(node->line_number, "Assignment to const variable");
+    }
+
     if (node->left->data_type != node->right->data_type)
         semantic_error(node->line_number, "Assignment type mismatch");
     node->data_type = node->left->data_type;
@@ -636,6 +644,10 @@ void analyze_increment_decrement(ASTNode *node) {
         node->left->type != NODE_MEMBER_ACCESS &&
         !(node->left->type == NODE_UN_OP && node->left->int_val == '*')) {
         semantic_error(node->line_number, "Operand of increment/decrement must be a modifiable lvalue");
+    }
+
+    if (node->left->sym && node->left->sym->is_const) {
+        semantic_error(node->line_number, "Increment/decrement of const variable");
     }
 
     if (node->left->data_type != TYPE_INT && node->left->data_type != TYPE_CHAR && node->left->pointer_level == 0) {

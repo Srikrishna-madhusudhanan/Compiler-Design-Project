@@ -91,6 +91,7 @@ typedef struct Symbol {
     // For variables initialized with a constant expression
     int const_value;
     int has_const_value;
+    int is_const;
 
     struct Symbol *next;          // hash chaining
     struct Symbol *next_member;   // linked list for struct/class members

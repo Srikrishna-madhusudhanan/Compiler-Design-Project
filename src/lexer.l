@@ -44,6 +44,7 @@ const char *token_name(int token) {
         case T_ARROW:   return "T_ARROW";
         case T_PRINTF:  return "T_PRINTF";
         case T_SCANF:   return "T_SCANF";
+        case T_CONST:   return "T_CONST";
 
         case T_IDENT:   return "T_IDENT";
         case T_NUMBER:  return "T_NUMBER";
@@ -92,6 +93,7 @@ STRING_LITERAL \"([^\\\n]|\\[nt'\"\\])*\"
 "int"       { SAVE_POS(); ADVANCE(); return T_INT; }
 "void"      { SAVE_POS(); ADVANCE(); return T_VOID; }
 "char"      { SAVE_POS(); ADVANCE(); return T_CHAR; }  // added 30/1/2026
+"const"     { SAVE_POS(); ADVANCE(); return T_CONST; }
 "struct"    { SAVE_POS(); ADVANCE(); return T_STRUCT; }
 "virtual"   { SAVE_POS(); ADVANCE(); return T_VIRTUAL; }
 "class"     { SAVE_POS(); ADVANCE(); return T_CLASS; }

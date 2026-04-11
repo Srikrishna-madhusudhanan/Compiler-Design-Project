@@ -449,8 +449,15 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     fprintf(out, "Load Array/Pointer\n");
                     load_address(out, instr->base,  "t0");
                     load_operand(out, instr->index, "t1");
-                    if (instr->scale > 1)
-                        fprintf(out, "  li t4, %d\n  mul t1, t1, t4\n", instr->scale);
+                    if (instr->scale == 2) {
+                        fprintf(out, "  slli t1, t1, 1\n");
+                    } else if (instr->scale == 4) {
+                        fprintf(out, "  slli t1, t1, 2\n");
+                    } else if (instr->scale == 8) {
+                        fprintf(out, "  slli t1, t1, 3\n");
+                    } else if (instr->scale > 1) {
+                        fprintf(out, "  li t2, %d\n  mul t1, t1, t2\n", instr->scale);
+                    }
                     fprintf(out, "  add t2, t0, t1\n");
                     if (instr->scale == 8)
                         fprintf(out, "  ld t2, 0(t2)\n");
@@ -474,14 +481,21 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     fprintf(out, "Store Array/Pointer\n");
                     load_address(out, instr->base,      "t0");
                     load_operand(out, instr->index,     "t1");
-                    if (instr->scale > 1)
-                        fprintf(out, "  li t4, %d\n  mul t1, t1, t4\n", instr->scale);
+                    if (instr->scale == 2) {
+                        fprintf(out, "  slli t1, t1, 1\n");
+                    } else if (instr->scale == 4) {
+                        fprintf(out, "  slli t1, t1, 2\n");
+                    } else if (instr->scale == 8) {
+                        fprintf(out, "  slli t1, t1, 3\n");
+                    } else if (instr->scale > 1) {
+                        fprintf(out, "  li t2, %d\n  mul t1, t1, t2\n", instr->scale);
+                    }
                     load_operand(out, instr->store_val, "t2");
-                    fprintf(out, "  add t3, t0, t1\n");
+                    fprintf(out, "  add t0, t0, t1\n");
                     if (instr->scale == 8)
-                        fprintf(out, "  sd t2, 0(t3)\n");
+                        fprintf(out, "  sd t2, 0(t0)\n");
                     else
-                        fprintf(out, "  sw t2, 0(t3)\n");
+                        fprintf(out, "  sw t2, 0(t0)\n");
                     break;
 
                 case IR_PARAM:

@@ -56,7 +56,7 @@ ASTNode *root = NULL;
 
 /* Tokens */
 %token <intval> T_INT T_VOID T_CHAR T_STRUCT T_VIRTUAL T_CLASS T_PUBLIC T_PRIVATE T_COLON
-%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF
+%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST
 %token <str>    T_IDENT T_STRING_LIT
 %token <intval> T_NUMBER T_CHAR_LIT
 %token <intval> T_ARROW T_TILDE
@@ -186,6 +186,36 @@ declaration
             $$ = append_node(result, $2);
         } else {
             $$ = $2;
+        }
+    }
+    | T_CONST type_specifier declarator_list ';' {
+        ASTNode *result = NULL;
+        ASTNode *type_node = NULL;
+
+        if ($2->type == NODE_STRUCT_DEF) {
+            result = $2;
+            type_node = create_type_node(T_STRUCT);
+            type_node->str_val = strdup($2->str_val);
+            type_node->left = $2;
+        } else {
+            type_node = $2;
+        }
+
+        ASTNode *temp = $3;
+        while(temp) {
+            temp->left = type_node;
+            temp->is_const = 1; /* Mark as const */
+            if (type_node->type == NODE_TYPE && type_node->int_val == T_STRUCT) {
+                if (!temp->left->str_val && type_node->str_val)
+                    temp->left->str_val = strdup(type_node->str_val);
+            }
+            temp = temp->next;
+        }
+
+        if (result) {
+            $$ = append_node(result, $3);
+        } else {
+            $$ = $3;
         }
     }
     | type_specifier declarator_list error {

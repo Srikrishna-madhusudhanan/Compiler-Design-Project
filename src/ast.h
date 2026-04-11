@@ -93,6 +93,7 @@ typedef struct ASTNode {
     // New: constructor and destructor flags
     int is_constructor;
     int is_destructor;
+    int is_const;          // const qualifier
     struct Symbol *sym;    // Resolved symbol for variables
 } ASTNode;
 

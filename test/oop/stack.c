@@ -58,8 +58,8 @@ int main() {
     s.push(30);
 
     int x= s.pop();
-    printf("%d popped from the stack", x);
-    printf("The top element is %d", s.peek());
+    printf("%d popped from the stack\n", x);
+    printf("The top element is %d\n", s.peek());
     
     return 0;
 }
