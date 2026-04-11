@@ -1,140 +1,70 @@
 function main:
-  param .LC0
-  call printf, 1
-  t0 := &n$1
-  param .LC1
-  param t0
-  call scanf, 2
-  t1 := 4 * n$1
-  t2 := t1 * n$1
-  A$2 := alloca t2
-  B$3 := alloca t2
-  C$4 := alloca t2
-  param .LC2
-  param n$1
-  param n$1
-  call printf, 3
-  i$5 := 0
-  t7 := &k$10
+  n$2 := 20
+  store a$1[0] (scale 4) := 64
+  store a$1[1] (scale 4) := 34
+  store a$1[2] (scale 4) := 25
+  store a$1[3] (scale 4) := 12
+  store a$1[4] (scale 4) := 22
+  store a$1[5] (scale 4) := 11
+  store a$1[6] (scale 4) := 90
+  store a$1[7] (scale 4) := 88
+  store a$1[8] (scale 4) := 76
+  store a$1[9] (scale 4) := 54
+  store a$1[10] (scale 4) := 32
+  store a$1[11] (scale 4) := 16
+  store a$1[12] (scale 4) := 8
+  store a$1[13] (scale 4) := 4
+  store a$1[14] (scale 4) := 2
+  store a$1[15] (scale 4) := 1
+  store a$1[16] (scale 4) := 0
+  store a$1[17] (scale 4) := -1
+  store a$1[18] (scale 4) := -23
+  store a$1[19] (scale 4) := -32
+  i$3 := 0
+  t3 := n$2 - 1
 L0:
-  if i$5 >= n$1 goto L3
+  if i$3 >= t3 goto L3
 L1:
-  j$6 := 0
-  t9 := i$5 * n$1
+  j$4 := 0
+  t4 := n$2 - i$3
+  t5 := t4 - 1
 L4:
-  if j$6 >= n$1 goto L7
+  if j$4 >= t5 goto L7
 L5:
-  param .LC3
-  param i$5
-  param j$6
-  call printf, 3
-  param .LC4
-  param t7
-  call scanf, 2
-  t10 := j$6 + t9
-  store A$2[t10] (scale 4) := k$10
-  t12 := j$6 + 1
-  j$6 := t12
+  t6 := load a$1[j$4] (scale 4)
+  t7 := j$4 + 1
+  t8 := load a$1[t7] (scale 4)
+  if t6 <= t8 goto L10
+L8:
+  t9 := load a$1[j$4] (scale 4)
+  t10 := j$4 + 1
+  t11 := load a$1[t10] (scale 4)
+  store a$1[j$4] (scale 4) := t11
+  store a$1[t10] (scale 4) := t9
+L10:
+  t13 := j$4 + 1
+  j$4 := t13
   goto L4
 L7:
-  t14 := i$5 + 1
-  i$5 := t14
+  t14 := i$3 + 1
+  i$3 := t14
   goto L0
 L3:
-  param .LC5
-  param n$1
-  param n$1
-  call printf, 3
-  i$5 := 0
-  t15 := &k$11
-L8:
-  if i$5 >= n$1 goto L11
-L9:
-  j$6 := 0
-  t17 := i$5 * n$1
-L12:
-  if j$6 >= n$1 goto L15
-L13:
-  param .LC6
-  param i$5
-  param j$6
-  call printf, 3
-  param .LC7
-  param t15
-  call scanf, 2
-  t18 := j$6 + t17
-  store B$3[t18] (scale 4) := k$11
-  t20 := j$6 + 1
-  j$6 := t20
-  goto L12
-L15:
-  t22 := i$5 + 1
-  i$5 := t22
-  goto L8
+  param .LC0
+  call printf, 1
+  i$3 := 0
 L11:
-  i$5 := 0
-L16:
-  if i$5 >= n$1 goto L19
-L17:
-  j$6 := 0
-  t24 := i$5 * n$1
-  t27 := i$5 * n$1
-L20:
-  if j$6 >= n$1 goto L23
-L21:
-  t25 := j$6 + t24
-  store C$4[t25] (scale 4) := 0
-  k$7 := 0
-  t37 := j$6 + t27
-L24:
-  if k$7 >= n$1 goto L27
-L25:
-  t28 := k$7 + t27
-  t29 := load A$2[t28] (scale 4)
-  t31 := k$7 * n$1
-  t32 := j$6 + t31
-  t33 := load B$3[t32] (scale 4)
-  t34 := t29 * t33
-  t38 := load C$4[t37] (scale 4)
-  t39 := t38 + t34
-  store C$4[t37] (scale 4) := t39
-  t44 := k$7 + 1
-  k$7 := t44
-  goto L24
-L27:
-  t46 := j$6 + 1
-  j$6 := t46
-  goto L20
-L23:
-  t48 := i$5 + 1
-  i$5 := t48
-  goto L16
-L19:
-  param .LC8
-  call printf, 1
-  i$5 := 0
-L28:
-  if i$5 >= n$1 goto L31
-L29:
-  j$6 := 0
-  t50 := i$5 * n$1
-L32:
-  if j$6 >= n$1 goto L35
-L33:
-  t51 := j$6 + t50
-  t52 := load C$4[t51] (scale 4)
-  param .LC9
-  param t52
+  if i$3 >= n$2 goto L14
+L12:
+  t15 := load a$1[i$3] (scale 4)
+  param .LC1
+  param t15
   call printf, 2
-  t54 := j$6 + 1
-  j$6 := t54
-  goto L32
-L35:
-  param .LC10
+  t16 := i$3 + 1
+  i$3 := t16
+  goto L11
+L14:
+  param .LC2
   call printf, 1
-  t56 := i$5 + 1
-  i$5 := t56
-  goto L28
-L31:
   return 0
 

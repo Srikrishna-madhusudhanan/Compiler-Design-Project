@@ -3,6 +3,8 @@
 
 #include "ir.h"
 
+struct CompilerMetrics;
+
 /* Optimization level */
 typedef enum {
     OPT_O0,
@@ -48,8 +50,8 @@ typedef struct CFG {
     int block_count;
 } CFG;
 
-/* Main entry point for IR optimizations */
-void optimize_program(IRProgram *prog);
+/* Main entry point for IR optimizations (metrics may be NULL; O0 skips all IR opts) */
+void optimize_program(IRProgram *prog, OptLevel level, struct CompilerMetrics *metrics);
 
 /* CFG Lifecycle */
 CFG* build_cfg(IRFunc *f);
@@ -59,8 +61,6 @@ IRInstr* flatten_cfg(CFG *cfg);
 /* Liveness analysis (also used by register allocator) */
 void compute_liveness(CFG *cfg);
 
-/* Dead code / unreachable block elimination */
-void eliminate_dead_code(CFG *cfg);
 void eliminate_unreachable_blocks(CFG *cfg);
 
 #endif /* IR_OPT_H */

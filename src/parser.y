@@ -9,6 +9,7 @@
 #include "ir_opt.h"
 #include "reg_alloc.h"
 #include "riscv_gen.h"
+#include "compiler_metrics.h"
 
 void print_vtables() {
     Scope *global = current_scope;
@@ -789,15 +790,38 @@ void yyerror(const char *s) {
 }
 
 int main(int argc, char **argv) {
-    // Check for --debug flag
     int arg_idx = 1;
-    if (argc > 1 && strcmp(argv[1], "--debug") == 0) {
-        // yydebug = 1; // Needs #define YYDEBUG 1
-        arg_idx++;
-        printf("Debug mode enabled\n");
+    int want_metrics = 0;
+    OptLevel opt_level = OPT_O2;
+    while (arg_idx < argc) {
+        if (strcmp(argv[arg_idx], "--debug") == 0) {
+            arg_idx++;
+            printf("Debug mode enabled\n");
+            continue;
+        }
+        if (strcmp(argv[arg_idx], "--metrics") == 0) {
+            arg_idx++;
+            want_metrics = 1;
+            continue;
+        }
+        if (strncmp(argv[arg_idx], "-O", 2) == 0) {
+            const char *lvl = argv[arg_idx] + 2;
+            if (strcmp(lvl, "0") == 0)
+                opt_level = OPT_O0;
+            else if (strcmp(lvl, "1") == 0)
+                opt_level = OPT_O1;
+            else if (strcmp(lvl, "2") == 0)
+                opt_level = OPT_O2;
+            else {
+                fprintf(stderr, "Unknown optimization level: %s (use -O0, -O1, or -O2)\n", argv[arg_idx]);
+                return 1;
+            }
+            arg_idx++;
+            continue;
+        }
+        break;
     }
 
-    // Check for filename
     if (arg_idx < argc) {
         FILE *file = fopen(argv[arg_idx], "r");
         if (!file) {
@@ -820,21 +844,49 @@ int main(int argc, char **argv) {
 
           IRProgram *ir = ir_generate(root);
           if (ir) {
+            CompilerMetrics metrics = {0};
+            if (want_metrics)
+                compiler_metrics_init(&metrics);
+
             ir_print_program(ir);
             print_vtables();
             ir_export_to_file(ir, "ir.txt");
 
-            printf("Optimizing IR...\n");
-            optimize_program(ir);
-            printf("Optimization complete. Optimized IR printed below:\n");
+            if (want_metrics)
+                metrics.pre_opt_ir_instructions = compiler_metrics_count_ir_instructions(ir);
+
+            if (opt_level == OPT_O0)
+                printf("Skipping IR optimization (-O0).\n");
+            else
+                printf("Optimizing IR...\n");
+            optimize_program(ir, opt_level, want_metrics ? &metrics : NULL);
+            if (opt_level == OPT_O0)
+                printf("IR unchanged (optimization level O0). Optimized IR printed below:\n");
+            else
+                printf("Optimization complete. Optimized IR printed below:\n");
             ir_print_program(ir);
             ir_export_to_file(ir, "ir_opt.txt");
+
+            if (want_metrics) {
+                metrics.post_opt_ir_instructions = compiler_metrics_count_ir_instructions(ir);
+                metrics.post_opt_basic_blocks = compiler_metrics_count_basic_blocks(ir);
+            }
+
             /* Register allocation (Chaitin's graph coloring) */
             printf("Running register allocation...\n");
             RegAllocResult **ra_results = reg_alloc_program(ir);
             printf("Register allocation complete.\n");
 
+            if (want_metrics)
+                compiler_metrics_set_spill_total(&metrics, ra_results);
+
             riscv_generate(ir, ra_results, "output.s");
+
+            if (want_metrics) {
+                compiler_metrics_read_assembly_lines(&metrics, "output.s");
+                compiler_metrics_print_and_save(&metrics, "compiler_metrics.txt");
+            }
+
             reg_alloc_free_all(ra_results);
             ir_free_program(ir);
           }

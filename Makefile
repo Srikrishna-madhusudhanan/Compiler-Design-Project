@@ -14,6 +14,7 @@ OBJS = $(BUILD_DIR)/y.tab.o \
        $(BUILD_DIR)/semantic.o \
        $(BUILD_DIR)/ir.o \
        $(BUILD_DIR)/ir_gen.o \
+       $(BUILD_DIR)/compiler_metrics.o \
        $(BUILD_DIR)/ir_opt.o \
        $(BUILD_DIR)/ir_sched.o \
        $(BUILD_DIR)/reg_alloc.o \
@@ -45,4 +46,4 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) ast.dot ir.txt ir_opt.txt output.s
+	rm -rf $(BUILD_DIR) ast.dot ir.txt ir_opt.txt output.s compiler_metrics.txt

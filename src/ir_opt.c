@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ir_opt.h"
+#include "compiler_metrics.h"
 #include "y.tab.h"
 
 /* --- CFG Construction --- */
@@ -784,7 +785,7 @@ void compute_liveness(CFG *cfg) {
     }
 }
 
-void eliminate_dead_code(CFG *cfg) {
+static void eliminate_dead_code(CFG *cfg, CompilerMetrics *metrics) {
     if (!cfg) return;
     compute_liveness(cfg);
 
@@ -850,6 +851,11 @@ void eliminate_dead_code(CFG *cfg) {
                      if (new_tail) new_tail->next = arr[i];
                      new_tail = arr[i];
                  } else {
+                     if (metrics) {
+                         metrics->dce_removed_instructions++;
+                         if (arr[i]->result)
+                             metrics->dce_removed_definitions++;
+                     }
                      free_instr_single(arr[i]);
                  }
              }
@@ -1214,8 +1220,9 @@ static void detect_tail_calls(IRFunc *f) {
 
 /* --- Main Optimization Pipeline --- */
 
-void optimize_program(IRProgram *prog) {
+void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics) {
     if (!prog) return;
+    if (level == OPT_O0) return;
 
     IRFunc *f = prog->funcs;
     while (f) {
@@ -1230,13 +1237,14 @@ void optimize_program(IRProgram *prog) {
             }
 
             mark_reachable_and_cleanup(cfg);
-            eliminate_dead_code(cfg);
+            eliminate_dead_code(cfg, metrics);
 
             merge_trivial_blocks(cfg);
-            mark_reachable_and_cleanup(cfg); 
+            mark_reachable_and_cleanup(cfg);
 
-            optimize_loops(cfg); 
-            
+            if (level >= OPT_O2)
+                optimize_loops(cfg);
+
             f->instrs = flatten_cfg(cfg);
             free_cfg(cfg);
             

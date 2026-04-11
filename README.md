@@ -40,6 +40,11 @@ Compile and run a single C test with QEMU via the helper pipeline:
 ./scripts/qemu_run.sh test/complex/factorial_tail_recursive.c "7\n"
 ```
 
+You can also add these flags to the above command:
+- Include metrics information (which will be stored in `compiler_metrics.txt`) using `--metrics`.
+- Choose the optimization level (0, 1 or 2): `-O1`, `-O2`, `-O3`.
+
+
 ## Meet the Team
 - Adithya Ananth (CS23B001)
 - Srikrishna Madhusudhanan (CS23B056)
