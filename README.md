@@ -42,7 +42,7 @@ Compile and run a single C test with QEMU via the helper pipeline:
 
 You can also add these flags to the above command:
 - Include metrics information (which will be stored in `compiler_metrics.txt`) using `--metrics`.
-- Choose the optimization level (0, 1 or 2): `-O1`, `-O2`, `-O3`.
+- Choose the optimization level (0, 1 or 2): `-O0`, `-O1`, `-O2`.
 
 
 ## Meet the Team
