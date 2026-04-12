@@ -23,6 +23,9 @@ OBJS = $(BUILD_DIR)/y.tab.o \
 
 all: setup parser
 
+rvas:
+	$(MAKE) -C tools/rvas
+
 # Ensure build directory exists
 setup:
 	@mkdir -p $(BUILD_DIR)

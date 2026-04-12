@@ -1,5 +1,58 @@
 {
   "type": "FUNC_DEF",
+  "value": "helper",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "BLOCK",
+  "children": [
+{
+  "type": "RETURN",
+  "children": [
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "x",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 1,
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+  ]
+},
+{
+  "type": "PARAM",
+  "value": "x",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+}
+  ]
+}
+  ],
+  "next": {
+  "type": "FUNC_DEF",
   "value": "main",
   "children": [
 {
@@ -13,10 +66,17 @@
   "children": [
 {
   "type": "VAR_DECL",
-  "value": "x",
+  "value": "i",
   "children": [
 {
   "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 0,
   "children": [
 
   ]
@@ -24,103 +84,162 @@
   ],
   "next": {
   "type": "VAR_DECL",
-  "value": "y",
+  "value": "sum",
   "children": [
 {
   "type": "TYPE",
   "children": [
 
   ]
-}
-  ],
-  "next": {
-  "type": "VAR_DECL",
-  "value": "result",
-  "children": [
+},
 {
-  "type": "TYPE",
+  "type": "INT",
+  "value": 0,
   "children": [
 
   ]
 }
   ],
   "next": {
-  "type": "ASSIGN",
+  "type": "FOR",
+  "children": [
+{
+  "type": "BIN_OP",
+  "value": "<",
   "children": [
 {
   "type": "VAR",
-  "value": "x",
+  "value": "i",
   "children": [
 
   ]
 },
 {
   "type": "INT",
-  "value": 11,
+  "value": 10,
   "children": [
 
   ]
 }
-  ],
-  "next": {
+  ]
+},
+{
+  "type": "BLOCK",
+  "children": [
+{
   "type": "ASSIGN",
   "children": [
 {
   "type": "VAR",
-  "value": "y",
+  "value": "sum",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
+  ]
+},
+{
+  "type": "FUNC_CALL",
+  "value": "helper",
+  "children": [
+{
+  "type": "VAR",
+  "value": "helper",
+  "children": [
+
+  ]
+},
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+  ]
+}
+  ]
+},
+{
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
   "children": [
 
   ]
 },
 {
   "type": "INT",
-  "value": 20,
+  "value": 0,
   "children": [
 
   ]
 }
-  ],
-  "next": {
+  ]
+},
+{
   "type": "ASSIGN",
   "children": [
 {
   "type": "VAR",
-  "value": "result",
+  "value": "i",
   "children": [
 
   ]
 },
 {
   "type": "BIN_OP",
-  "value": "-",
+  "value": "+",
   "children": [
 {
   "type": "VAR",
-  "value": "x",
+  "value": "i",
   "children": [
 
   ]
 },
 {
-  "type": "BIN_OP",
-  "value": "*",
-  "children": [
-{
-  "type": "VAR",
-  "value": "y",
-  "children": [
-
-  ]
-},
-{
-  "type": "VAR",
-  "value": "x",
+  "type": "INT",
+  "value": 1,
   "children": [
 
   ]
 }
   ]
 }
+  ]
+}
+  ],
+  "next": {
+  "type": "PRINTF",
+  "children": [
+{
+  "type": "STRING",
+  "value": "Sum: %d\n",
+  "children": [
+
+  ]
+},
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
   ]
 }
   ],
@@ -129,7 +248,7 @@
   "children": [
 {
   "type": "VAR",
-  "value": "result",
+  "value": "sum",
   "children": [
 
   ]
@@ -140,9 +259,8 @@
 }
 }
 }
-}
-}
   ]
 }
   ]
+}
 }

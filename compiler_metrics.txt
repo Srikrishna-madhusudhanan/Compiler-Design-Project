@@ -1,9 +1,9 @@
 === Compiler metrics ===
-Code size (IR instructions, pre-opt):    6
-Code size (IR instructions, post-opt):   6
-Basic blocks (post-optimization, CFG):  1
-DCE removed instructions:               0
-DCE removed definitions (with result):  0
+Code size (IR instructions, pre-opt):    22
+Code size (IR instructions, post-opt):   19
+Basic blocks (post-optimization, CFG):  5
+DCE removed instructions:               1
+DCE removed definitions (with result):  1
 Register pressure (spilled variables):  0
-Assembly non-blank / non-comment lines: 32
+Assembly non-blank / non-comment lines: 84
 ==========================
