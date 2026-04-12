@@ -82,10 +82,30 @@ static RvOperand *parse_operand(RvToken **cur, RvToken *end, bool *ok) {
         (*cur)++;
         if (*cur >= end || (*cur)->kind != TOK_INT)
             return NULL;
+        int32_t v = (int32_t)(-(*cur)->intval);
+        (*cur)++;
+        if (*cur < end && (*cur)->kind == TOK_LPAREN) {
+            (*cur)++;
+            if (*cur >= end || (*cur)->kind != TOK_IDENT)
+                return NULL;
+            RvOperand *o = calloc(1, sizeof(*o));
+            o->kind = RV_OP_MEM;
+            o->imm = v;
+            o->reg = -1;
+            o->sym = xstrdup((*cur)->ptr, (*cur)->len);
+            (*cur)++;
+            if (*cur >= end || (*cur)->kind != TOK_RPAREN) {
+                free(o->sym);
+                free(o);
+                return NULL;
+            }
+            (*cur)++;
+            *ok = true;
+            return o;
+        }
         RvOperand *o = calloc(1, sizeof(*o));
         o->kind = RV_OP_IMM;
-        o->imm = (int32_t)(-(*cur)->intval);
-        (*cur)++;
+        o->imm = v;
         *ok = true;
         return o;
     }
