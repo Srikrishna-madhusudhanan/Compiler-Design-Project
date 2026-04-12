@@ -1,0 +1,15 @@
+{
+  "func_name": "Calculator_add_int_int",
+  "nodes": [
+    {"id": 0, "name": "this$5", "color": 2, "spilled": 0, "spill_offset": 0},
+    {"id": 1, "name": "x$6", "color": 1, "spilled": 0, "spill_offset": 0},
+    {"id": 2, "name": "y$7", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 3, "name": "t0", "color": 0, "spilled": 0, "spill_offset": 0}
+  ],
+  "edges": [
+    {"from": 0, "to": 1},
+    {"from": 0, "to": 2},
+    {"from": 1, "to": 2}
+  ],
+  "stack": [0, 1, 2, 3]
+}

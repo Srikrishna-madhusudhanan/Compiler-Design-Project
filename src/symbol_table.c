@@ -104,6 +104,9 @@ Symbol *create_symbol(char *name, DataType type,
     sym->scope = NULL;
     sym->vtable_index = -1;
     sym->is_address_taken = 0;
+    sym->const_value = 0;
+    sym->has_const_value = 0;
+    sym->is_const = 0;
 
     static int symbol_id_counter = 0;
     snprintf(sym->ir_name, sizeof(sym->ir_name), "%s$%d", name, symbol_id_counter++);

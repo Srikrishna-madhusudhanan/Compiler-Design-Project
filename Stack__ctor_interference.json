@@ -1,0 +1,10 @@
+{
+  "func_name": "Stack__ctor",
+  "nodes": [
+    {"id": 0, "name": "this$3", "color": 0, "spilled": 0, "spill_offset": 0}
+  ],
+  "edges": [
+
+  ],
+  "stack": [0]
+}

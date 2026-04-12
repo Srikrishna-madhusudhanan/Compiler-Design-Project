@@ -75,8 +75,8 @@ const char* get_op_string(int op) {
 
 
 
-int generate_dot(ASTNode *node, FILE *out) {
-    if (!node) return -1;
+int generate_dot(ASTNode *node, FILE *out, int depth) {
+    if (!node || depth > 20) return -1;
 
     int my_id = node_counter++;
 
@@ -105,8 +105,8 @@ int generate_dot(ASTNode *node, FILE *out) {
     // Recursively generate children
     #define CONNECT(child) \
         if (node->child) { \
-            int child_id = generate_dot(node->child, out); \
-            fprintf(out, "node%d -> node%d;\n", my_id, child_id); \
+            int child_id = generate_dot(node->child, out, depth + 1); \
+            if (child_id != -1) fprintf(out, "node%d -> node%d;\n", my_id, child_id); \
         }
 
     CONNECT(left);
@@ -119,8 +119,8 @@ int generate_dot(ASTNode *node, FILE *out) {
 
     // Handle next (sibling)
     if (node->next) {
-        int next_id = generate_dot(node->next, out);
-        fprintf(out, "node%d -> node%d [style=dashed];\n", my_id, next_id);
+        int next_id = generate_dot(node->next, out, depth + 1);
+        if (next_id != -1) fprintf(out, "node%d -> node%d [style=dashed];\n", my_id, next_id);
     }
 
     return my_id;
@@ -137,14 +137,18 @@ void export_ast_to_dot(ASTNode *root, const char *filename) {
     fprintf(out, "node [shape=box];\n");
 
     node_counter = 0;
-    generate_dot(root, out);
+    generate_dot(root, out, 0);
 
     fprintf(out, "}\n");
     fclose(out);
 }
 
-static void generate_json(ASTNode *node, FILE *out, int is_first) {
-    if (!node) return;
+static void generate_json(ASTNode *node, FILE *out, int is_first, int depth) {
+    if (!node || depth > 20) {
+        if (!is_first) fprintf(out, ",\n");
+        fprintf(out, "{\"type\": \"max_depth\"}");
+        return;
+    }
 
     if (!is_first) fprintf(out, ",\n");
     fprintf(out, "{\n");
@@ -160,18 +164,18 @@ static void generate_json(ASTNode *node, FILE *out, int is_first) {
 
     fprintf(out, "  \"children\": [\n");
     int first_child = 1;
-    if (node->left) { generate_json(node->left, out, first_child); first_child = 0; }
-    if (node->right) { generate_json(node->right, out, first_child); first_child = 0; }
-    if (node->cond) { generate_json(node->cond, out, first_child); first_child = 0; }
-    if (node->body) { generate_json(node->body, out, first_child); first_child = 0; }
-    if (node->params) { generate_json(node->params, out, first_child); first_child = 0; }
-    if (node->init) { generate_json(node->init, out, first_child); first_child = 0; }
-    if (node->incr) { generate_json(node->incr, out, first_child); first_child = 0; }
+    if (node->left) { generate_json(node->left, out, first_child, depth + 1); first_child = 0; }
+    if (node->right) { generate_json(node->right, out, first_child, depth + 1); first_child = 0; }
+    if (node->cond) { generate_json(node->cond, out, first_child, depth + 1); first_child = 0; }
+    if (node->body) { generate_json(node->body, out, first_child, depth + 1); first_child = 0; }
+    if (node->params) { generate_json(node->params, out, first_child, depth + 1); first_child = 0; }
+    if (node->init) { generate_json(node->init, out, first_child, depth + 1); first_child = 0; }
+    if (node->incr) { generate_json(node->incr, out, first_child, depth + 1); first_child = 0; }
     fprintf(out, "\n  ]");
 
     if (node->next) {
         fprintf(out, ",\n  \"next\": ");
-        generate_json(node->next, out, 1);
+        generate_json(node->next, out, 1, depth + 1);
     }
 
     fprintf(out, "\n}");
@@ -184,7 +188,8 @@ void export_ast_to_json(ASTNode *root, const char *filename) {
         return;
     }
 
-    generate_json(root, out, 1);
+    node_counter = 0;
+    generate_json(root, out, 1, 0);
 
     fclose(out);
 }
@@ -227,6 +232,9 @@ ASTNode* create_node(NodeType type) {
     node->member_sym = NULL;
     node->is_constructor = 0;
     node->is_destructor = 0;
+    node->sym = NULL;
+    node->inheritance_modifier = 0;
+    node->is_const = 0;
     return node;
 }
 

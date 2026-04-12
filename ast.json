@@ -1,0 +1,254 @@
+{
+  "type": "FUNC_DEF",
+  "value": "main",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "BLOCK",
+  "children": [
+{
+  "type": "VAR_DECL",
+  "value": "sum",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 0,
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "VAR_DECL",
+  "value": "i",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 0,
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "WHILE",
+  "children": [
+{
+  "type": "BIN_OP",
+  "value": "<",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 6,
+  "children": [
+
+  ]
+}
+  ]
+},
+{
+  "type": "BLOCK",
+  "children": [
+{
+  "type": "IF",
+  "children": [
+{
+  "type": "BLOCK",
+  "children": [
+{
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
+  ]
+},
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+  ]
+},
+{
+  "type": "BLOCK",
+  "children": [
+{
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "*",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 2,
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+  ]
+}
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "==",
+  "children": [
+{
+  "type": "BIN_OP",
+  "value": "%",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 2,
+  "children": [
+
+  ]
+}
+  ]
+},
+{
+  "type": "INT",
+  "value": 0,
+  "children": [
+
+  ]
+}
+  ]
+}
+  ],
+  "next": {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 1,
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+}
+  ]
+}
+  ],
+  "next": {
+  "type": "RETURN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "sum",
+  "children": [
+
+  ]
+}
+  ]
+}
+}
+}
+}
+  ]
+}
+  ]
+}

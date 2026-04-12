@@ -1,0 +1,12 @@
+{
+  "func_name": "Stack_isEmpty",
+  "nodes": [
+    {"id": 0, "name": "t1", "color": 1, "spilled": 0, "spill_offset": 0},
+    {"id": 1, "name": "t0", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 2, "name": "this$15", "color": 0, "spilled": 0, "spill_offset": 0}
+  ],
+  "edges": [
+    {"from": 0, "to": 1}
+  ],
+  "stack": [0, 1, 2]
+}
