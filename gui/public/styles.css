@@ -155,9 +155,71 @@ header {
     line-height: 1.5;
 }
 
-#ast-viz, #ra-viz {
+#ast-viz, #ra-viz, #cfg-viz {
     width: 100%;
     height: 100%;
+}
+
+#cfg-panel { flex: 1; min-height: 100px; }
+
+/* Panel Controls */
+.panel-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.panel-controls button {
+    padding: 0px 6px;
+    height: 20px;
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.panel-controls button:hover {
+    background: var(--accent-color);
+    color: var(--bg-color);
+}
+
+/* Panel States */
+.panel.minimized {
+    height: 40px !important;
+    flex: none !important;
+    width: auto !important;
+}
+
+.panel.minimized .panel-content {
+    display: none;
+}
+
+.panel.maximized {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2000 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+}
+
+.panel.maximized .panel-content {
+    height: calc(100vh - 40px) !important;
+}
+
+/* CFG Node Styling (Blocks) */
+.cfg-node {
+    background: #e0f2f1;
+    border: 2px solid #009688;
+    border-radius: 5px;
+    padding: 10px;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
 }
 
 .dashboard-grid {

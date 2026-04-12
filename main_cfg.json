@@ -1,0 +1,42 @@
+{
+  "func_name": "main",
+  "blocks": [
+    {
+      "id": 0,
+      "instrs": [
+        "  i$2 := 0",
+        "  sum$3 := 0"
+      ],
+      "successors": [1]
+    },
+    {
+      "id": 1,
+      "instrs": [
+        "L0:",
+        "  if i$2 >= 10 goto L2"
+      ],
+      "successors": [3, 2]
+    },
+    {
+      "id": 2,
+      "instrs": [
+        "L1:",
+        "  t0 = *a$1",
+        "  t1 := sum$3 + t0",
+        "  sum$3 := t1",
+        "  t2 := i$2 + 1",
+        "  i$2 := t2",
+        "  goto L0"
+      ],
+      "successors": [1]
+    },
+    {
+      "id": 3,
+      "instrs": [
+        "L2:",
+        "  return sum$3"
+      ],
+      "successors": []
+    }
+  ]
+}

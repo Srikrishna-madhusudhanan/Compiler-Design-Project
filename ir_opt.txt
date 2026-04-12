@@ -1,4 +1,5 @@
 function main:
+<<<<<<< HEAD
   param .LC0
   call printf, 1
   t0 := &n$1
@@ -137,4 +138,19 @@ L35:
   goto L28
 L31:
   return 0
+=======
+  i$2 := 0
+  sum$3 := 0
+  t0 := load a$1[0] (scale 4)
+L0:
+  if i$2 >= 10 goto L2
+L1:
+  t1 := sum$3 + t0
+  sum$3 := t1
+  t2 := i$2 + 1
+  i$2 := t2
+  goto L0
+L2:
+  return sum$3
+>>>>>>> 2298eb7 (UI updates)
 

@@ -159,6 +159,7 @@ void ir_program_add_string(IRProgram *prog, char *label, char *val);
 void ir_print_instr(IRInstr *instr);
 void ir_print_func(IRFunc *f);
 void ir_print_program(IRProgram *prog);
+int ir_snprint_instr(char *buf, size_t size, IRInstr *instr);
 void ir_export_to_file(IRProgram *prog, const char *filename);
 
 /* --- Cleanup --- */

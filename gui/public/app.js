@@ -20,6 +20,7 @@ let astNetwork = null;
 let raNetwork = null;
 let currentAstData = null;
 let currentRaData = null;
+let currentCfgData = null;
 let metricsChart = null;
 
 // Initialize Chart
@@ -153,6 +154,10 @@ async function animateRa(data) {
     };
     
     raNetwork = new vis.Network(container, { nodes, edges }, options);
+
+    raNetwork.on("stabilizationIterationsDone", function () {
+        raNetwork.setOptions( { physics: false } );
+    });
     
     const palette = ["#FAD7A0", "#D2B4DE", "#F1948A", "#A3E4D7", "#85C1E9", "#82E0AA", "#F8C471", "#F0B27A", "#C39BD3", "#7FB3D3"];
     
@@ -170,6 +175,37 @@ async function animateRa(data) {
         }
     }
     log('Register Allocation coloring complete.', 'success');
+}
+
+// CFG Rendering
+async function renderCFG(data) {
+    if (!data || !data.blocks || data.blocks.length === 0) return;
+    log('Rendering Control Flow Graph...', 'info');
+
+    const nodes = new vis.DataSet(data.blocks.map(b => ({
+        id: b.id,
+        label: `B${b.id}\n----------\n${b.instrs.join('\n')}`,
+        shape: 'box',
+        font: { face: 'monospace', align: 'left', size: 12 },
+        color: { background: '#f0f9ff', border: '#0369a1' }
+    })));
+
+    const edges = [];
+    data.blocks.forEach(b => {
+        b.successors.forEach(s => {
+            edges.push({ from: b.id, to: s, arrows: 'to', color: '#0369a1' });
+        });
+    });
+
+    const container = document.getElementById('cfg-viz');
+    const options = {
+        layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', nodeSpacing: 150 } },
+        physics: false,
+        edges: { smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.5 } }
+    };
+
+    new vis.Network(container, { nodes, edges: new vis.DataSet(edges) }, options);
+    log('CFG Rendering complete.', 'success');
 }
 
 // Compile Handling
@@ -201,9 +237,11 @@ compileBtn.addEventListener('click', async () => {
             
             currentAstData = data.ast_json;
             currentRaData = data.ra_json[0]; // Take first function
+            currentCfgData = data.cfg_json[0];
             
             // Static viz
             renderStaticViz(currentAstData, currentRaData);
+            if (currentCfgData) renderCFG(currentCfgData);
         }
     } catch (e) {
         log('Connection error.', 'error');
@@ -272,6 +310,25 @@ runBtn.addEventListener('click', async () => {
 initChart();
 loadExamples();
 log('System Ready.');
+
+// Panel Controls (Min/Max)
+document.querySelectorAll('.panel-controls').forEach(controls => {
+    const panel = controls.closest('.panel');
+    const minBtn = controls.querySelector('.min-btn');
+    const maxBtn = controls.querySelector('.max-btn');
+
+    minBtn.onclick = (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('minimized');
+        panel.classList.remove('maximized');
+    };
+
+    maxBtn.onclick = (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('maximized');
+        panel.classList.remove('minimized');
+    };
+});
 
 // ==========================================
 // Resizer Logic

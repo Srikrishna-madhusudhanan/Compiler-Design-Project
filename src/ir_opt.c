@@ -120,6 +120,43 @@ CFG* build_cfg(IRFunc *f) {
     return cfg;
 }
 
+void export_cfg_to_json(CFG *cfg, const char *path) {
+    if (!cfg || !path) return;
+    FILE *fp = fopen(path, "w");
+    if (!fp) return;
+
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"func_name\": \"%s\",\n", cfg->func_name);
+    fprintf(fp, "  \"blocks\": [\n");
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        fprintf(fp, "    {\n");
+        fprintf(fp, "      \"id\": %d,\n", bb->id);
+        fprintf(fp, "      \"instrs\": [\n");
+        IRInstr *instr = bb->instrs;
+        while (instr) {
+            char buf[256];
+            ir_snprint_instr(buf, sizeof(buf), instr);
+            // JSON escape: replace " with ' if any, but IR doesn't usually have " except for strings
+            // For simplicity, we just wrap it.
+            fprintf(fp, "        \"%s\"%s\n", buf, (instr == bb->last) ? "" : ",");
+            if (instr == bb->last) break;
+            instr = instr->next;
+        }
+        fprintf(fp, "      ],\n");
+        fprintf(fp, "      \"successors\": [");
+        for (int i = 0; i < bb->succ_count; i++) {
+            fprintf(fp, "%d%s", bb->succs[i]->id, (i == bb->succ_count - 1) ? "" : ", ");
+        }
+        fprintf(fp, "]\n");
+        fprintf(fp, "    }%s\n", (bb->next) ? "," : "");
+        bb = bb->next;
+    }
+    fprintf(fp, "  ]\n");
+    fprintf(fp, "}\n");
+    fclose(fp);
+}
+
 void free_cfg(CFG *cfg) {
     if (!cfg) return;
     BasicBlock *bb = cfg->blocks;
@@ -1230,6 +1267,10 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
 
         CFG *cfg = build_cfg(f);
         if (cfg) {
+            char cfg_path[128];
+            snprintf(cfg_path, sizeof(cfg_path), "%s_cfg.json", f->name);
+            export_cfg_to_json(cfg, cfg_path);
+
             BasicBlock *bb = cfg->blocks;
             while (bb) {
                 optimize_bb(bb);

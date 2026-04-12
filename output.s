@@ -1,6 +1,7 @@
   .text
   .globl main
 
+<<<<<<< HEAD
   .section .rodata
 .LC10:
   .asciz "\n"
@@ -542,5 +543,68 @@ L31:
   ld ra, 152(sp)
   ld s0, 144(sp)
   addi sp, sp, 160
+=======
+main:
+  # --- Prologue (Frame Size: 128) ---
+  addi sp, sp, -128
+  sd ra, 120(sp)
+  sd s0, 112(sp)
+  addi s0, sp, 128
+
+  # Line 6: Load Array/Pointer
+  addi t0, s0, -56
+  li t1, 0
+  slli t1, t1, 2
+  add t2, t0, t1
+  lw t2, 0(t2)
+  mv t5, t2
+  # Line 3: i$2 = ...
+  li t0, 0
+  mv t4, t0
+  # Line 4: sum$3 = ...
+  li t0, 0
+  mv t3, t0
+  # Line 8: label
+L0:
+  # Line 5: if (...) goto L2
+  mv t0, t4
+  li t1, 10
+  bge t0, t1, L2
+  # Line 8: label
+L1:
+  # Line 6: t1 = ... + ...
+  mv t0, t3
+  mv t1, t5
+  add t2, t0, t1
+  mv t3, t2
+  # Line 7: t2 = ... + ...
+  mv t0, t4
+  li t1, 1
+  add t2, t0, t1
+  mv t4, t2
+  # Line 6: sum$3 = ...
+  mv t0, t3
+  mv t3, t0
+  # Line 7: i$2 = ...
+  mv t0, t4
+  mv t4, t0
+  # Line 8: goto L0
+  j L0
+  # Line 8: label
+L2:
+  # Line 9: return
+  mv a0, t3
+  addi sp, s0, -128
+  ld ra, 120(sp)
+  ld s0, 112(sp)
+  addi sp, sp, 128
+  jr ra
+
+  # --- Default Epilogue ---
+  addi sp, s0, -128
+  ld ra, 120(sp)
+  ld s0, 112(sp)
+  addi sp, sp, 128
+>>>>>>> 2298eb7 (UI updates)
   jr ra
 

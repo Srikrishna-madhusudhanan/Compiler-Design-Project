@@ -1,0 +1,22 @@
+{
+  "func_name": "main",
+  "nodes": [
+    {"id": 0, "name": "i$2", "color": 1, "spilled": 0, "spill_offset": 0},
+    {"id": 1, "name": "sum$3", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 2, "name": "t0", "color": 2, "spilled": 0, "spill_offset": 0},
+    {"id": 3, "name": "a$1", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 4, "name": "t2", "color": 1, "spilled": 0, "spill_offset": 0},
+    {"id": 5, "name": "t1", "color": 0, "spilled": 0, "spill_offset": 0}
+  ],
+  "edges": [
+    {"from": 0, "to": 1},
+    {"from": 0, "to": 2},
+    {"from": 0, "to": 5},
+    {"from": 1, "to": 2},
+    {"from": 1, "to": 4},
+    {"from": 2, "to": 4},
+    {"from": 2, "to": 5},
+    {"from": 4, "to": 5}
+  ],
+  "stack": [0, 1, 2, 3, 4, 5]
+}

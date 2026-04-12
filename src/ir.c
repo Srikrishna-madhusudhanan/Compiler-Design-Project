@@ -399,6 +399,100 @@ void ir_print_instr(IRInstr *instr) {
     }
 }
 
+static int snprint_operand(char *buf, size_t size, IROperand *op) {
+    if (op->is_const)
+        return snprintf(buf, size, "%d", op->const_val);
+    else if (op->name)
+        return snprintf(buf, size, "%s", op->name);
+    else
+        return snprintf(buf, size, "?");
+}
+
+int ir_snprint_instr(char *buf, size_t size, IRInstr *instr) {
+    if (!instr || size == 0) return 0;
+    int n = 0;
+    switch (instr->kind) {
+        case IR_ASSIGN:
+            n += snprintf(buf + n, size - n, "  %s := ", instr->result);
+            n += snprint_operand(buf + n, size - n, &instr->src);
+            break;
+        case IR_BINOP:
+            n += snprintf(buf + n, size - n, "  %s := ", instr->result);
+            n += snprint_operand(buf + n, size - n, &instr->left);
+            n += snprintf(buf + n, size - n, " %s ", binop_str(instr->binop));
+            n += snprint_operand(buf + n, size - n, &instr->right);
+            break;
+        case IR_UNOP:
+            n += snprintf(buf + n, size - n, "  %s = %c", instr->result, instr->unop);
+            n += snprint_operand(buf + n, size - n, &instr->unop_src);
+            break;
+        case IR_PARAM:
+            n += snprintf(buf + n, size - n, "  param ");
+            n += snprint_operand(buf + n, size - n, &instr->src);
+            break;
+        case IR_CALL:
+            if (instr->result)
+                n += snprintf(buf + n, size - n, "  %s := call %s, %d", instr->result, instr->call_fn, instr->arg_count);
+            else
+                n += snprintf(buf + n, size - n, "  call %s, %d", instr->call_fn, instr->arg_count);
+            break;
+        case IR_CALL_INDIRECT:
+            if (instr->result)
+                n += snprintf(buf + n, size - n, "  %s := call *", instr->result);
+            else
+                n += snprintf(buf + n, size - n, "  call *");
+            n += snprint_operand(buf + n, size - n, &instr->base);
+            n += snprintf(buf + n, size - n, ", %d", instr->arg_count);
+            break;
+        case IR_RETURN:
+            if (instr->src.name || instr->src.is_const) {
+                n += snprintf(buf + n, size - n, "  return ");
+                n += snprint_operand(buf + n, size - n, &instr->src);
+            } else
+                n += snprintf(buf + n, size - n, "  return");
+            break;
+        case IR_LABEL:
+            n += snprintf(buf + n, size - n, "%s:", instr->label);
+            break;
+        case IR_GOTO:
+            n += snprintf(buf + n, size - n, "  goto %s", instr->label);
+            break;
+        case IR_IF:
+            n += snprintf(buf + n, size - n, "  if ");
+            n += snprint_operand(buf + n, size - n, &instr->if_left);
+            n += snprintf(buf + n, size - n, " %s ", relop_str(instr->relop));
+            n += snprint_operand(buf + n, size - n, &instr->if_right);
+            n += snprintf(buf + n, size - n, " goto %s", instr->label);
+            break;
+        case IR_LOAD:
+            n += snprintf(buf + n, size - n, "  %s = ", instr->result ? instr->result : "?");
+            if (instr->index.is_const && instr->index.const_val == 0) n += snprintf(buf + n, size - n, "*");
+            n += snprint_operand(buf + n, size - n, &instr->base);
+            if (!(instr->index.is_const && instr->index.const_val == 0)) {
+                n += snprintf(buf + n, size - n, "[");
+                n += snprint_operand(buf + n, size - n, &instr->index);
+                n += snprintf(buf + n, size - n, "]");
+            }
+            break;
+        case IR_STORE:
+            if (instr->index.is_const && instr->index.const_val == 0) n += snprintf(buf + n, size - n, "  *");
+            n += snprint_operand(buf + n, size - n, &instr->base);
+            if (!(instr->index.is_const && instr->index.const_val == 0)) {
+                n += snprintf(buf + n, size - n, "[");
+                n += snprint_operand(buf + n, size - n, &instr->index);
+                n += snprintf(buf + n, size - n, "]");
+            }
+            n += snprintf(buf + n, size - n, " = ");
+            n += snprint_operand(buf + n, size - n, &instr->store_val);
+            break;
+        case IR_ALLOCA:
+            n += snprintf(buf + n, size - n, "  %s := alloca ", instr->result);
+            n += snprint_operand(buf + n, size - n, &instr->src);
+            break;
+    }
+    return n;
+}
+
 void ir_print_func(IRFunc *f) {
     if (!f) return;
     printf("function %s:\n", f->name);

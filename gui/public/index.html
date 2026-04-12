@@ -31,7 +31,10 @@
     <div id="layout-root">
         <div id="top-section">
             <div id="left-pane" class="panel">
-                <div class="panel-header">Source Code</div>
+                <div class="panel-header">
+                    Source Code
+                    <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                </div>
                 <div class="panel-content" style="flex: 1;">
                     <textarea id="editor" spellcheck="false">int main() {
     int x = 10;
@@ -40,7 +43,10 @@
     return z;
 }</textarea>
                 </div>
-                <div class="panel-header">Intermediate Representation</div>
+                <div class="panel-header">
+                    Intermediate Representation
+                    <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                </div>
                 <div class="panel-content" style="height: 300px; background: #111; color: #aaa; padding: 10px; font-family: monospace; font-size: 12px;">
                     <pre id="ir-output">Run compile to see IR...</pre>
                 </div>
@@ -55,16 +61,32 @@
                         <div class="anim-controls">
                             <button class="anim-btn" id="anim-ast">Animate Build</button>
                         </div>
+                        <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
                     </div>
                     <div class="panel-content" id="ast-container">
                         <div id="ast-viz"></div>
                     </div>
                 </div>
 
+                <div class="resizer-v" id="resizer-v-cfg"></div>
+
+                <div id="cfg-panel" class="panel">
+                    <div class="panel-header">
+                        Control Flow Graph
+                        <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                    </div>
+                    <div class="panel-content" id="cfg-container">
+                        <div id="cfg-viz"></div>
+                    </div>
+                </div>
+
                 <div class="resizer-v" id="resizer-v1"></div>
 
                 <div id="metrics-panel" class="panel">
-                    <div class="panel-header">Performance Metrics Dashboard</div>
+                    <div class="panel-header">
+                        Performance Metrics Dashboard
+                        <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                    </div>
                     <div class="panel-content" style="display: flex;">
                         <div class="dashboard-grid" id="metrics-grid" style="flex: 1;">
                             <div class="metric-card">
@@ -99,6 +121,7 @@
                     <div class="anim-controls">
                         <button class="anim-btn" id="anim-ra">Animate Coloring</button>
                     </div>
+                    <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
                 </div>
                 <div class="panel-content" id="ra-container">
                     <div id="ra-viz"></div>
@@ -109,7 +132,10 @@
         <div class="resizer-v" id="resizer-v2"></div>
 
         <div id="bottom-section" class="panel terminal">
-            <div class="panel-header" style="background: transparent; border-bottom: none; color: #0f0;">Terminal Output</div>
+            <div class="panel-header" style="background: transparent; border-bottom: none; color: #0f0;">
+                Terminal Output
+                <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+            </div>
             <div class="panel-content" id="terminal-output" style="padding: 10px; overflow-y: auto;">
                 Welcome to PaniniC Compiler Lab. Select an example or write code above then hit Compile.
             </div>

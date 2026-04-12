@@ -57,6 +57,7 @@ void optimize_program(IRProgram *prog, OptLevel level, struct CompilerMetrics *m
 CFG* build_cfg(IRFunc *f);
 void free_cfg(CFG *cfg);
 IRInstr* flatten_cfg(CFG *cfg);
+void export_cfg_to_json(CFG *cfg, const char *path);
 
 /* Liveness analysis (also used by register allocator) */
 void compute_liveness(CFG *cfg);

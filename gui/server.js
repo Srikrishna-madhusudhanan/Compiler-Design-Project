@@ -25,7 +25,7 @@ app.post('/api/compile', (req, res) => {
     // Cleanup old interference files
     const oldFiles = fs.readdirSync(ROOT_DIR);
     oldFiles.forEach(f => {
-        if (f.endsWith('_interference.json')) fs.unlinkSync(path.join(ROOT_DIR, f));
+        if (f.endsWith('_interference.json') || f.endsWith('_cfg.json')) fs.unlinkSync(path.join(ROOT_DIR, f));
     });
 
     let command = `${COMPILER_PATH} -O${optimizationLevel} ${useMetrics ? '--metrics' : ''} ${tempFile}`;
@@ -42,7 +42,8 @@ app.post('/api/compile', (req, res) => {
             ir_opt: '',
             metrics: '',
             ast_json: null,
-            ra_json: []
+            ra_json: [],
+            cfg_json: []
         };
         
         const irFile = path.join(ROOT_DIR, 'ir.txt');
@@ -61,12 +62,16 @@ app.post('/api/compile', (req, res) => {
             } catch (e) {}
         }
         
-        // Look for all _interference.json files
+        // Look for all _interference.json and _cfg.json files
         const files = fs.readdirSync(ROOT_DIR);
         files.forEach(file => {
             if (file.endsWith('_interference.json')) {
                 try {
                     result.ra_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8')));
+                } catch (e) {}
+            } else if (file.endsWith('_cfg.json')) {
+                try {
+                    result.cfg_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8')));
                 } catch (e) {}
             }
         });
