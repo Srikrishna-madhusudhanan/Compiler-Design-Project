@@ -12,6 +12,8 @@ typedef struct CompilerMetrics {
     int dce_removed_definitions;
     int total_spilled_variables;
     int assembly_nonblank_lines;
+    double execution_time_s;
+    long peak_memory_kb;
 } CompilerMetrics;
 
 void compiler_metrics_init(CompilerMetrics *m);

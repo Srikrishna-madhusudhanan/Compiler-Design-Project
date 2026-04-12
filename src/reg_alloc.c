@@ -598,11 +598,25 @@ static RegAllocResult *allocate_function(IRFunc *f) {
     /* Build the result lookup table */
     res = build_result(ig, f->name);
 
-    /* Phase 6: export DOT file (one per function, last round's graph) */
+    /* Phase 6: export DOT and JSON (one per function, last round's graph) */
     char dot_path[128];
+    char json_path[128];
     snprintf(dot_path, sizeof(dot_path), "%s_interference.dot", f->name);
+    snprintf(json_path, sizeof(json_path), "%s_interference.json", f->name);
+    
+    /* We need the stack from the last round where n_spills was determined but we broke.
+       Actually, simplify is called inside the loop. To get the final stack, 
+       we should run simplify one last time on the final graph if we want to show it.
+       Or just move the export inside the loop. 
+       Actually, if n_spills == 0, the coloring is final.
+    */
+    int final_stack_size;
+    int *final_stack = simplify(ig, &final_stack_size);
+    
     reg_alloc_export_dot(ig, res, dot_path);
+    reg_alloc_export_json(ig, res, final_stack, final_stack_size, json_path);
 
+    free(final_stack);
     ig_free(ig);
     return res;
 }
@@ -737,4 +751,41 @@ void reg_alloc_export_dot(InterferenceGraph *ig, RegAllocResult *res,
     fprintf(fp, "}\n");
     fclose(fp);
     printf("[reg_alloc] Interference graph written to %s\n", path);
+}
+
+void reg_alloc_export_json(InterferenceGraph *ig, RegAllocResult *res, 
+                           int *stack, int stack_size, const char *path) {
+    if (!ig || !path) return;
+    FILE *fp = fopen(path, "w");
+    if (!fp) return;
+
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"func_name\": \"%s\",\n", ig->func_name);
+    fprintf(fp, "  \"nodes\": [\n");
+    for (int i = 0; i < ig->count; i++) {
+        fprintf(fp, "    {\"id\": %d, \"name\": \"%s\", \"color\": %d, \"spilled\": %d, \"spill_offset\": %d}%s\n",
+                i, ig->nodes[i].name, ig->nodes[i].color, ig->nodes[i].spilled, 
+                ig->nodes[i].spill_offset, (i == ig->count - 1) ? "" : ",");
+    }
+    fprintf(fp, "  ],\n");
+    fprintf(fp, "  \"edges\": [\n");
+    int first_edge = 1;
+    for (int i = 0; i < ig->count; i++) {
+        for (int j = 0; j < ig->nodes[i].degree; j++) {
+            int nb = ig->nodes[i].neighbours[j];
+            if (nb > i) {
+                if (!first_edge) fprintf(fp, ",\n");
+                fprintf(fp, "    {\"from\": %d, \"to\": %d}", i, nb);
+                first_edge = 0;
+            }
+        }
+    }
+    fprintf(fp, "\n  ],\n");
+    fprintf(fp, "  \"stack\": [");
+    for (int i = 0; i < stack_size; i++) {
+        fprintf(fp, "%d%s", stack[i], (i == stack_size - 1) ? "" : ", ");
+    }
+    fprintf(fp, "]\n");
+    fprintf(fp, "}\n");
+    fclose(fp);
 }

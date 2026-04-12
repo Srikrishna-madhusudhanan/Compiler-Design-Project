@@ -99,6 +99,7 @@ typedef struct ASTNode {
 
 
 void export_ast_to_dot(ASTNode *root, const char *filename);
+void export_ast_to_json(ASTNode *root, const char *filename);
 
 
 

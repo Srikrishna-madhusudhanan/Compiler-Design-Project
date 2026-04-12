@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaniniC Compiler Lab - Premium GUI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+    <script src="lib/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="lib/chart.js/dist/chart.umd.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span>🚀</span> PaniniC Compiler
+        </div>
+        <div class="controls">
+            <select id="example-select">
+                <option value="">Load Example...</option>
+            </select>
+            <select id="opt-level">
+                <option value="0">O0 (No Opt)</option>
+                <option value="1">O1 (Basic)</option>
+                <option value="2" selected>O2 (Full)</option>
+            </select>
+            <button id="compile-btn">Compile & Viz</button>
+            <button id="run-btn" class="secondary">Run Benchmarks</button>
+        </div>
+    </header>
+
+    <div id="layout-root">
+        <div id="top-section">
+            <div id="left-pane" class="panel">
+                <div class="panel-header">Source Code</div>
+                <div class="panel-content" style="flex: 1;">
+                    <textarea id="editor" spellcheck="false">int main() {
+    int x = 10;
+    int y = 20;
+    int z = x + y;
+    return z;
+}</textarea>
+                </div>
+                <div class="panel-header">Intermediate Representation</div>
+                <div class="panel-content" style="height: 300px; background: #111; color: #aaa; padding: 10px; font-family: monospace; font-size: 12px;">
+                    <pre id="ir-output">Run compile to see IR...</pre>
+                </div>
+            </div>
+
+            <div class="resizer-h" id="resizer-h1"></div>
+
+            <div id="center-pane">
+                <div id="ast-panel" class="panel">
+                    <div class="panel-header">
+                        AST Visualization
+                        <div class="anim-controls">
+                            <button class="anim-btn" id="anim-ast">Animate Build</button>
+                        </div>
+                    </div>
+                    <div class="panel-content" id="ast-container">
+                        <div id="ast-viz"></div>
+                    </div>
+                </div>
+
+                <div class="resizer-v" id="resizer-v1"></div>
+
+                <div id="metrics-panel" class="panel">
+                    <div class="panel-header">Performance Metrics Dashboard</div>
+                    <div class="panel-content" style="display: flex;">
+                        <div class="dashboard-grid" id="metrics-grid" style="flex: 1;">
+                            <div class="metric-card">
+                                <div class="metric-value" id="m-pre-ir">-</div>
+                                <div class="metric-label">Pre-Opt IR</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="m-post-ir">-</div>
+                                <div class="metric-label">Post-Opt IR</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="m-time">-</div>
+                                <div class="metric-label">Exec Time (s)</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="m-mem">-</div>
+                                <div class="metric-label">Peak Mem (KB)</div>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="flex: 1;">
+                            <canvas id="metrics-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resizer-h" id="resizer-h2"></div>
+
+            <div id="right-pane" class="panel">
+                <div class="panel-header">
+                    Register Allocation
+                    <div class="anim-controls">
+                        <button class="anim-btn" id="anim-ra">Animate Coloring</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="ra-container">
+                    <div id="ra-viz"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="resizer-v" id="resizer-v2"></div>
+
+        <div id="bottom-section" class="panel terminal">
+            <div class="panel-header" style="background: transparent; border-bottom: none; color: #0f0;">Terminal Output</div>
+            <div class="panel-content" id="terminal-output" style="padding: 10px; overflow-y: auto;">
+                Welcome to PaniniC Compiler Lab. Select an example or write code above then hit Compile.
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

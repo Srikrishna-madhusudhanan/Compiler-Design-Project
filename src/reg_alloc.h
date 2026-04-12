@@ -121,6 +121,8 @@ int reg_alloc_is_spilled(RegAllocResult *res, const char *var_name);
  */
 void reg_alloc_export_dot(InterferenceGraph *ig, RegAllocResult *res,
                            const char *path);
+void reg_alloc_export_json(InterferenceGraph *ig, RegAllocResult *res, 
+                           int *stack, int stack_size, const char *path);
 
 /**
  * Free a NULL-terminated array of RegAllocResult* returned by reg_alloc_program().

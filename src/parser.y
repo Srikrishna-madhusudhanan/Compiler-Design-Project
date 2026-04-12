@@ -902,6 +902,7 @@ int main(int argc, char **argv) {
         if (root) {
             print_ast(root, 0);
             export_ast_to_dot(root, "ast.dot");
+            export_ast_to_json(root, "ast.json");
         }
         return 0;
     } else {

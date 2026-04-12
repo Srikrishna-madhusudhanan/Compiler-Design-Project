@@ -76,6 +76,10 @@ void compiler_metrics_fprint(const CompilerMetrics *m, FILE *fp) {
     fprintf(fp, "DCE removed definitions (with result):  %d\n", m->dce_removed_definitions);
     fprintf(fp, "Register pressure (spilled variables):  %d\n", m->total_spilled_variables);
     fprintf(fp, "Assembly non-blank / non-comment lines: %d\n", m->assembly_nonblank_lines);
+    if (m->execution_time_s > 0)
+        fprintf(fp, "Execution time:                         %.4f s\n", m->execution_time_s);
+    if (m->peak_memory_kb > 0)
+        fprintf(fp, "Peak memory usage:                      %ld KB\n", m->peak_memory_kb);
     fprintf(fp, "==========================\n");
 }
 

@@ -1,0 +1,148 @@
+{
+  "type": "FUNC_DEF",
+  "value": "main",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "BLOCK",
+  "children": [
+{
+  "type": "VAR_DECL",
+  "value": "x",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "VAR_DECL",
+  "value": "y",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "VAR_DECL",
+  "value": "result",
+  "children": [
+{
+  "type": "TYPE",
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "x",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 11,
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "y",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 20,
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "result",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "-",
+  "children": [
+{
+  "type": "VAR",
+  "value": "x",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "*",
+  "children": [
+{
+  "type": "VAR",
+  "value": "y",
+  "children": [
+
+  ]
+},
+{
+  "type": "VAR",
+  "value": "x",
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+  ],
+  "next": {
+  "type": "RETURN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "result",
+  "children": [
+
+  ]
+}
+  ]
+}
+}
+}
+}
+}
+}
+}
+  ]
+}
+  ]
+}

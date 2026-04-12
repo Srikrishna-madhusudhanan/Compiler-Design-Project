@@ -143,6 +143,52 @@ void export_ast_to_dot(ASTNode *root, const char *filename) {
     fclose(out);
 }
 
+static void generate_json(ASTNode *node, FILE *out, int is_first) {
+    if (!node) return;
+
+    if (!is_first) fprintf(out, ",\n");
+    fprintf(out, "{\n");
+    fprintf(out, "  \"type\": \"%s\",\n", node_type_to_string(node->type));
+    
+    if (node->str_val) {
+        fprintf(out, "  \"value\": \"%s\",\n", node->str_val);
+    } else if (node->type == NODE_BIN_OP || node->type == NODE_UN_OP) {
+        fprintf(out, "  \"value\": \"%s\",\n", get_op_string(node->int_val));
+    } else if (node->type == NODE_CONST_INT) {
+        fprintf(out, "  \"value\": %d,\n", node->int_val);
+    }
+
+    fprintf(out, "  \"children\": [\n");
+    int first_child = 1;
+    if (node->left) { generate_json(node->left, out, first_child); first_child = 0; }
+    if (node->right) { generate_json(node->right, out, first_child); first_child = 0; }
+    if (node->cond) { generate_json(node->cond, out, first_child); first_child = 0; }
+    if (node->body) { generate_json(node->body, out, first_child); first_child = 0; }
+    if (node->params) { generate_json(node->params, out, first_child); first_child = 0; }
+    if (node->init) { generate_json(node->init, out, first_child); first_child = 0; }
+    if (node->incr) { generate_json(node->incr, out, first_child); first_child = 0; }
+    fprintf(out, "\n  ]");
+
+    if (node->next) {
+        fprintf(out, ",\n  \"next\": ");
+        generate_json(node->next, out, 1);
+    }
+
+    fprintf(out, "\n}");
+}
+
+void export_ast_to_json(ASTNode *root, const char *filename) {
+    FILE *out = fopen(filename, "w");
+    if (!out) {
+        perror("Cannot open json file");
+        return;
+    }
+
+    generate_json(root, out, 1);
+
+    fclose(out);
+}
+
 
 
 ASTNode* create_node(NodeType type) {

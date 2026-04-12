@@ -52,15 +52,34 @@ echo "--> Running Parser with flags: $COMPILER_FLAGS"
 
 # --- 3. Assemble and Link ---
 TMP_EXE="$(mktemp /tmp/qemu_run_XXXXXX.elf)"
-cleanup() { rm -f "$TMP_EXE"; }
-trap cleanup EXIT
+TIME_OUTPUT="$(mktemp /tmp/qemu_time_XXXXXX.txt)"
+
+cleanup_all() { rm -f "$TMP_EXE" "$TIME_OUTPUT"; }
+trap cleanup_all EXIT
 
 $RISCVC -static -o "$TMP_EXE" output.s
 
 # --- 4. Execute with QEMU ---
 echo "--> Executing in QEMU..."
 if [ -n "$INPUT" ]; then
-    printf '%s' "$INPUT" | "$QEMU" "$TMP_EXE"
+    printf '%s' "$INPUT" | /usr/bin/time -f "%e %M" -o "$TIME_OUTPUT" "$QEMU" "$TMP_EXE"
 else
-    "$QEMU" "$TMP_EXE"
+    /usr/bin/time -f "%e %M" -o "$TIME_OUTPUT" "$QEMU" "$TMP_EXE"
+fi
+
+# --- 5. Append Metrics if requested ---
+if [[ "$COMPILER_FLAGS" == *"--metrics"* ]]; then
+    if [ -s "$TIME_OUTPUT" ]; then
+        READ_TIME=$(cat "$TIME_OUTPUT")
+        EXEC_TIME=$(echo "$READ_TIME" | cut -d' ' -f1)
+        PEAK_MEM=$(echo "$READ_TIME" | cut -d' ' -f2)
+        
+        if [ -f "compiler_metrics.txt" ]; then
+            # Remove existing end marker if present
+            sed -i '/==========================/d' compiler_metrics.txt
+            echo "Execution time:                         $EXEC_TIME s" >> compiler_metrics.txt
+            echo "Peak memory usage:                      $PEAK_MEM KB" >> compiler_metrics.txt
+            echo "==========================" >> compiler_metrics.txt
+        fi
+    fi
 fi
