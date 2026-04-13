@@ -1,91 +1,810 @@
 function main:
-  sum$1 := 0
+  total$1 := 0
   i$2 := 0
 L0:
+L3:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L4:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L5:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L6:
-  t0 := i$2 % 2
-  if t0 != 0 goto L8
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L7:
-  t1 := sum$1 + i$2
-  sum$1 := t1
-  goto L9
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L8:
-  t2 := i$2 + i$2
-  t3 := sum$1 + t2
-  sum$1 := t3
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L9:
-  t4 := i$2 + 1
-  i$2 := t4
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L10:
-  t0 := i$2 % 2
-  if t0 != 0 goto L12
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L11:
-  t1 := sum$1 + i$2
-  sum$1 := t1
-  goto L13
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L12:
-  t2 := i$2 + i$2
-  t3 := sum$1 + t2
-  sum$1 := t3
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L13:
-  t4 := i$2 + 1
-  i$2 := t4
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L14:
-  t0 := i$2 % 2
-  if t0 != 0 goto L16
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L15:
-  t1 := sum$1 + i$2
-  sum$1 := t1
-  goto L17
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L16:
-  t2 := i$2 + i$2
-  t3 := sum$1 + t2
-  sum$1 := t3
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L17:
-  t4 := i$2 + 1
-  i$2 := t4
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L18:
-  t0 := i$2 % 2
-  if t0 != 0 goto L20
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L19:
-  t1 := sum$1 + i$2
-  sum$1 := t1
-  goto L21
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L20:
-  t2 := i$2 + i$2
-  t3 := sum$1 + t2
-  sum$1 := t3
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L21:
-  t4 := i$2 + 1
-  i$2 := t4
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L22:
-  t0 := i$2 % 2
-  if t0 != 0 goto L24
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L23:
-  t1 := sum$1 + i$2
-  sum$1 := t1
-  goto L25
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L24:
-  t2 := i$2 + i$2
-  t3 := sum$1 + t2
-  sum$1 := t3
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L25:
-  t4 := i$2 + 1
-  i$2 := t4
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L26:
-  t0 := i$2 % 2
-  if t0 != 0 goto L28
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L27:
-  t1 := sum$1 + i$2
-  sum$1 := t1
-  goto L29
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L28:
-  t2 := i$2 + i$2
-  t3 := sum$1 + t2
-  sum$1 := t3
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L29:
-  t4 := i$2 + 1
-  i$2 := t4
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L30:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L31:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L32:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L33:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L34:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L35:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L36:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L37:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L38:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L39:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L40:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L41:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L42:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L43:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L44:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L45:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L46:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L47:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L48:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L49:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L50:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L51:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L52:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L53:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L54:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L55:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L56:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L57:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L58:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L59:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L60:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L61:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L62:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L63:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L64:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L65:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L66:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L67:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L68:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L69:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L70:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L71:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L72:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L73:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L74:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L75:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L76:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L77:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L78:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L79:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L80:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L81:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L82:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L83:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L84:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L85:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L86:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L87:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L88:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L89:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L90:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L91:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L92:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L93:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L94:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L95:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L96:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L97:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L98:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L99:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L100:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L101:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L102:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L103:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L104:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L105:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L106:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L107:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L108:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L109:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L110:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L111:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L112:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L113:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L114:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L115:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L116:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L117:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L118:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L119:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L120:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L121:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L122:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L123:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L124:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L125:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L126:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L127:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L128:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L129:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L130:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L131:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L132:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L133:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L134:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L135:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L136:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L137:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L138:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L139:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L140:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L141:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L142:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L143:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L144:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L145:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L146:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L147:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L148:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L149:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L150:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L151:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L152:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L153:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L154:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L155:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L156:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L157:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L158:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L159:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L160:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L161:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
+L162:
+  t0 := total$1 + 1
+  total$1 := t0
+  t1 := i$2 + 1
+  i$2 := t1
 L2:
-  return sum$1
+  param .LC0
+  param total$1
+  call printf, 2
+  return 0
 

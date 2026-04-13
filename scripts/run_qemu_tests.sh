@@ -134,14 +134,14 @@ run_ir_no_backedge_test() {
 run_test "test/complex/factorial_tail_recursive.c" "7\n" "Enter a positive integer: Tail-Recursive Factorial is 5040" "factorial_tail_recursive"
 
 # Full-unroll regression: multi-block loop body with exact trip count.
-run_test "test/optimizations/full_unroll_multiblock.c" "" "sum=24" "full_unroll_multiblock" "-O2"
+run_test "test/optimizations/loop_unroll_multiblock.c" "" "sum=24" "full_unroll_multiblock" "-O2"
 
 # Full-unroll regression: trip count above historical capped behavior.
-run_test "test/optimizations/full_unroll_large_trip.c" "" "total=160" "full_unroll_large_trip" "-O2"
+run_test "test/optimizations/loop_unroll_large.c" "" "total=160" "full_unroll_large_trip" "-O2"
 
 # IR-structure assertions: fully unrolled cases should have no backward branches.
-run_ir_no_backedge_test "test/optimizations/full_unroll_multiblock.c" "ir_no_backedge_full_unroll_multiblock"
-run_ir_no_backedge_test "test/optimizations/full_unroll_large_trip.c" "ir_no_backedge_full_unroll_large_trip"
+run_ir_no_backedge_test "test/optimizations/loop_unroll_multiblock.c" "ir_no_backedge_loop_unroll_multiblock"
+run_ir_no_backedge_test "test/optimizations/loop_unroll_large.c" "ir_no_backedge_loop_unroll_large"
 
 printf "\nResults: Passed=%d  Failed=%d\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

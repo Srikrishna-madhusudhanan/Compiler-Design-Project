@@ -4,7 +4,7 @@
     {
       "id": 0,
       "instrs": [
-        "  sum$1 := 0",
+        "  total$1 := 0",
         "  i$2 := 0"
       ],
       "successors": [1]
@@ -13,54 +13,30 @@
       "id": 1,
       "instrs": [
         "L0:",
-        "  if i$2 >= 6 goto L2"
+        "  if i$2 >= 160 goto L2"
       ],
-      "successors": [6, 2]
+      "successors": [3, 2]
     },
     {
       "id": 2,
       "instrs": [
         "L1:",
-        "  t0 := i$2 % 2",
-        "  if t0 != 0 goto L4"
-      ],
-      "successors": [4, 3]
-    },
-    {
-      "id": 3,
-      "instrs": [
-        "L3:",
-        "  t1 := sum$1 + i$2",
-        "  sum$1 := t1",
-        "  goto L5"
-      ],
-      "successors": [5]
-    },
-    {
-      "id": 4,
-      "instrs": [
-        "L4:",
-        "  t2 := i$2 * 2",
-        "  t3 := sum$1 + t2",
-        "  sum$1 := t3"
-      ],
-      "successors": [5]
-    },
-    {
-      "id": 5,
-      "instrs": [
-        "L5:",
-        "  t4 := i$2 + 1",
-        "  i$2 := t4",
+        "  t0 := total$1 + 1",
+        "  total$1 := t0",
+        "  t1 := i$2 + 1",
+        "  i$2 := t1",
         "  goto L0"
       ],
       "successors": [1]
     },
     {
-      "id": 6,
+      "id": 3,
       "instrs": [
         "L2:",
-        "  return sum$1"
+        "  param .LC0",
+        "  param total$1",
+        "  call printf, 2",
+        "  return 0"
       ],
       "successors": []
     }

@@ -11,5 +11,6 @@ int main() {
         i = i + 1;
     }
 
-    return sum;
+    printf("sum=%d", sum);
+    return 0;
 }
