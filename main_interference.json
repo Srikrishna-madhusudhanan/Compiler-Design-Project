@@ -1,21 +1,13 @@
 {
   "func_name": "main",
   "nodes": [
-    {"id": 0, "name": "total$1", "color": 0, "spilled": 0, "spill_offset": 0},
-    {"id": 1, "name": "i$2", "color": 1, "spilled": 0, "spill_offset": 0},
-    {"id": 2, "name": ".LC0", "color": 2, "spilled": 0, "spill_offset": 0},
-    {"id": 3, "name": "t1", "color": 1, "spilled": 0, "spill_offset": 0},
-    {"id": 4, "name": "t0", "color": 0, "spilled": 0, "spill_offset": 0}
+    {"id": 0, "name": "result$3", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 1, "name": "t0", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 2, "name": "x$1", "color": 1, "spilled": 0, "spill_offset": 0},
+    {"id": 3, "name": "y$2", "color": 0, "spilled": 0, "spill_offset": 0}
   ],
   "edges": [
-    {"from": 0, "to": 1},
-    {"from": 0, "to": 2},
-    {"from": 0, "to": 3},
-    {"from": 1, "to": 2},
-    {"from": 1, "to": 4},
-    {"from": 2, "to": 3},
-    {"from": 2, "to": 4},
-    {"from": 3, "to": 4}
+    {"from": 2, "to": 3}
   ],
-  "stack": [0, 1, 2, 3, 4]
+  "stack": [0, 1, 2, 3]
 }

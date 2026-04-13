@@ -109,6 +109,12 @@ header {
     background-color: var(--resizer-hover);
 }
 
+/* Hide resizers when a panel is maximized */
+body.has-maximized .resizer-h,
+body.has-maximized .resizer-v {
+    display: none;
+}
+
 /* Panels */
 .panel {
     background-color: var(--card-bg);
@@ -210,6 +216,7 @@ header {
 
 .panel.maximized .panel-content {
     height: calc(100vh - 40px) !important;
+    max-height: calc(100vh - 40px) !important;
 }
 
 /* CFG Node Styling (Blocks) */

@@ -158,6 +158,14 @@ async function animateRa(data) {
     raNetwork.on("stabilizationIterationsDone", function () {
         raNetwork.setOptions( { physics: false } );
     });
+
+    // Fallback: If it takes too long to stabilize, force stop physics
+    setTimeout(() => {
+        if (raNetwork) {
+            raNetwork.setOptions({ physics: false });
+            log('RA Stabilization forced (timeout).', 'warning');
+        }
+    }, 3000);
     
     const palette = ["#FAD7A0", "#D2B4DE", "#F1948A", "#A3E4D7", "#85C1E9", "#82E0AA", "#F8C471", "#F0B27A", "#C39BD3", "#7FB3D3"];
     
@@ -251,22 +259,40 @@ compileBtn.addEventListener('click', async () => {
 });
 
 function parseMetrics(text) {
+    if (!text) return {};
     const metrics = {};
     const lines = text.split('\n');
     lines.forEach(line => {
-        if (line.includes('pre-opt')) metrics.preIr = parseInt(line.match(/\d+/));
-        if (line.includes('post-opt')) metrics.postIr = parseInt(line.match(/\d+/));
-        if (line.includes('Execution time')) metrics.time = parseFloat(line.match(/[\d\.]+/));
-        if (line.includes('Peak memory')) metrics.mem = parseInt(line.match(/\d+/));
+        const preMatch = line.match(/pre-opt.*:\s+(\d+)/i);
+        if (preMatch) metrics.preIr = parseInt(preMatch[1]);
+        
+        const postMatch = line.match(/post-opt.*:\s+(\d+)/i);
+        if (postMatch) metrics.postIr = parseInt(postMatch[1]);
+        
+        const timeMatch = line.match(/Execution time:\s+([\d\.]+)/i);
+        if (timeMatch) metrics.time = parseFloat(timeMatch[1]);
+        
+        const memMatch = line.match(/Peak memory.*:\s+(\d+)/i);
+        if (memMatch) metrics.mem = parseInt(memMatch[1]);
     });
     return metrics;
 }
 
 function updateDashboard(metrics) {
-    if (metrics.preIr) mPreIr.textContent = metrics.preIr;
-    if (metrics.postIr) mPostIr.textContent = metrics.postIr;
-    if (metrics.time) mTime.textContent = metrics.time.toFixed(4);
-    if (metrics.mem) mMem.textContent = metrics.mem;
+    if (metrics.preIr !== undefined) mPreIr.textContent = metrics.preIr;
+    if (metrics.postIr !== undefined) mPostIr.textContent = metrics.postIr;
+    
+    if (metrics.time !== undefined && !isNaN(metrics.time)) {
+        mTime.textContent = metrics.time.toFixed(4);
+    } else {
+        mTime.textContent = '-';
+    }
+    
+    if (metrics.mem !== undefined && !isNaN(metrics.mem)) {
+        mMem.textContent = metrics.mem;
+    } else {
+        mMem.textContent = '-';
+    }
     
     metricsChart.data.datasets[0].data = [metrics.preIr || 0];
     metricsChart.data.datasets[1].data = [metrics.postIr || 0];
@@ -321,12 +347,23 @@ document.querySelectorAll('.panel-controls').forEach(controls => {
         e.stopPropagation();
         panel.classList.toggle('minimized');
         panel.classList.remove('maximized');
+        document.body.classList.remove('has-maximized');
     };
 
     maxBtn.onclick = (e) => {
         e.stopPropagation();
-        panel.classList.toggle('maximized');
-        panel.classList.remove('minimized');
+        const wasMaximized = panel.classList.contains('maximized');
+        
+        // Remove maximized from all other panels first
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('maximized'));
+        
+        if (!wasMaximized) {
+            panel.classList.add('maximized');
+            panel.classList.remove('minimized');
+            document.body.classList.add('has-maximized');
+        } else {
+            document.body.classList.remove('has-maximized');
+        }
     };
 });
 

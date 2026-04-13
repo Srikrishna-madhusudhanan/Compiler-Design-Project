@@ -13,17 +13,10 @@
   "children": [
 {
   "type": "VAR_DECL",
-  "value": "total",
+  "value": "x",
   "children": [
 {
   "type": "TYPE",
-  "children": [
-
-  ]
-},
-{
-  "type": "INT",
-  "value": 0,
   "children": [
 
   ]
@@ -31,54 +24,68 @@
   ],
   "next": {
   "type": "VAR_DECL",
-  "value": "i",
+  "value": "y",
   "children": [
 {
   "type": "TYPE",
   "children": [
 
   ]
-},
+}
+  ],
+  "next": {
+  "type": "VAR_DECL",
+  "value": "result",
+  "children": [
 {
-  "type": "INT",
-  "value": 0,
+  "type": "TYPE",
   "children": [
 
   ]
 }
   ],
   "next": {
-  "type": "WHILE",
-  "children": [
-{
-  "type": "BIN_OP",
-  "value": "<",
+  "type": "ASSIGN",
   "children": [
 {
   "type": "VAR",
-  "value": "i",
+  "value": "x",
   "children": [
 
   ]
 },
 {
   "type": "INT",
-  "value": 160,
+  "value": 11,
   "children": [
 
   ]
 }
-  ]
-},
-{
-  "type": "BLOCK",
-  "children": [
-{
+  ],
+  "next": {
   "type": "ASSIGN",
   "children": [
 {
   "type": "VAR",
-  "value": "total",
+  "value": "y",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 20,
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "result",
   "children": [
 
   ]
@@ -89,72 +96,18 @@
   "children": [
 {
   "type": "VAR",
-  "value": "total",
-  "children": [
-
-  ]
-},
-{
-  "type": "INT",
-  "value": 1,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ],
-  "next": {
-  "type": "ASSIGN",
-  "children": [
-{
-  "type": "VAR",
-  "value": "i",
-  "children": [
-
-  ]
-},
-{
-  "type": "BIN_OP",
-  "value": "+",
-  "children": [
-{
-  "type": "VAR",
-  "value": "i",
-  "children": [
-
-  ]
-},
-{
-  "type": "INT",
-  "value": 1,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ]
-}
-}
-  ]
-}
-  ],
-  "next": {
-  "type": "PRINTF",
-  "children": [
-{
-  "type": "STRING",
-  "value": "total=%d",
+  "value": "x",
   "children": [
 
   ]
 },
 {
   "type": "VAR",
-  "value": "total",
+  "value": "y",
   "children": [
 
+  ]
+}
   ]
 }
   ],
@@ -162,13 +115,15 @@
   "type": "RETURN",
   "children": [
 {
-  "type": "INT",
-  "value": 0,
+  "type": "VAR",
+  "value": "result",
   "children": [
 
   ]
 }
   ]
+}
+}
 }
 }
 }

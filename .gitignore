@@ -6,3 +6,4 @@ venv/
 *.dot
 ir.txt
 stack_frame_reference.txt
+changes_12_04.md

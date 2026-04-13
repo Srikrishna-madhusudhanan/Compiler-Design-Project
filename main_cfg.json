@@ -4,39 +4,11 @@
     {
       "id": 0,
       "instrs": [
-        "  total$1 := 0",
-        "  i$2 := 0"
-      ],
-      "successors": [1]
-    },
-    {
-      "id": 1,
-      "instrs": [
-        "L0:",
-        "  if i$2 >= 160 goto L2"
-      ],
-      "successors": [3, 2]
-    },
-    {
-      "id": 2,
-      "instrs": [
-        "L1:",
-        "  t0 := total$1 + 1",
-        "  total$1 := t0",
-        "  t1 := i$2 + 1",
-        "  i$2 := t1",
-        "  goto L0"
-      ],
-      "successors": [1]
-    },
-    {
-      "id": 3,
-      "instrs": [
-        "L2:",
-        "  param .LC0",
-        "  param total$1",
-        "  call printf, 2",
-        "  return 0"
+        "  x$1 := 11",
+        "  y$2 := 20",
+        "  t0 := x$1 + y$2",
+        "  result$3 := t0",
+        "  return result$3"
       ],
       "successors": []
     }

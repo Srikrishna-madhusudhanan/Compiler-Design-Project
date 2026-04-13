@@ -1899,21 +1899,25 @@ static void detect_tail_calls(IRFunc *f) {
     }
 }
 
-/* --- Main Optimization Pipeline --- */
-
 void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics) {
     if (!prog) return;
-    if (level == OPT_O0) return;
 
     IRFunc *f = prog->funcs;
     while (f) {
-        f->instrs = simplify_control_flow(f->instrs);
+        if (level > OPT_O0)
+            f->instrs = simplify_control_flow(f->instrs);
 
         CFG *cfg = build_cfg(f);
         if (cfg) {
             char cfg_path[128];
             snprintf(cfg_path, sizeof(cfg_path), "%s_cfg.json", f->name);
             export_cfg_to_json(cfg, cfg_path);
+
+            if (level == OPT_O0) {
+                free_cfg(cfg);
+                f = f->next;
+                continue;
+            }
 
             BasicBlock *bb = cfg->blocks;
             while (bb) {
