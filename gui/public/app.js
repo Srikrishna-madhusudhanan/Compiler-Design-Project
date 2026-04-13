@@ -163,7 +163,6 @@ async function animateRa(data) {
     setTimeout(() => {
         if (raNetwork) {
             raNetwork.setOptions({ physics: false });
-            log('RA Stabilization forced (timeout).', 'warning');
         }
     }, 3000);
     
@@ -179,7 +178,7 @@ async function animateRa(data) {
             nodes.update({ id: nodeId, color: '#ef4444', label: `${nodeData.name}\n(SPILL)` });
         } else if (nodeData.color >= 0) {
             const color = palette[nodeData.color % palette.length];
-            nodes.update({ id: nodeId, color: color, font: { color: '#000' } });
+            nodes.update({ id: nodeId, color: color, font: { color: '#fff' } });
         }
     }
     log('Register Allocation coloring complete.', 'success');
@@ -262,18 +261,34 @@ function parseMetrics(text) {
     if (!text) return {};
     const metrics = {};
     const lines = text.split('\n');
+    // Iterate ALL lines and keep OVERWRITING — so the LAST occurrence wins.
+    // This ensures QEMU runtime values (appended later) override compile-time placeholder values.
     lines.forEach(line => {
-        const preMatch = line.match(/pre-opt.*:\s+(\d+)/i);
+        const preMatch = line.match(/IR instructions, pre-opt.*:\s+(\d+)/i);
         if (preMatch) metrics.preIr = parseInt(preMatch[1]);
         
-        const postMatch = line.match(/post-opt.*:\s+(\d+)/i);
+        const postMatch = line.match(/IR instructions, post-opt.*:\s+(\d+)/i);
         if (postMatch) metrics.postIr = parseInt(postMatch[1]);
-        
-        const timeMatch = line.match(/Execution time:\s+([\d\.]+)/i);
-        if (timeMatch) metrics.time = parseFloat(timeMatch[1]);
-        
-        const memMatch = line.match(/Peak memory.*:\s+(\d+)/i);
-        if (memMatch) metrics.mem = parseInt(memMatch[1]);
+
+        // Match both "Execution time:" (compile) and "Execution time (wall):" (QEMU)
+        const timeMatch = line.match(/Execution time(?:\s*\(wall\))?:\s+([\d\.]+)/i);
+        if (timeMatch) {
+            metrics.time = parseFloat(timeMatch[1]);
+            if (line.includes('ns')) metrics.unit = 'ns';
+        }
+
+        // Match both "Peak memory usage:" and "Peak memory:" formats
+        const memMatch = line.match(/Peak memory(?:\s+usage)?.*:\s+(.*)/i);
+        if (memMatch) {
+            const rawVal = memMatch[1].trim();
+            const val = rawVal.split(/\s+/)[0];  // handles trailing newlines/spaces
+            const parsedMem = parseInt(val);
+            if (!isNaN(parsedMem)) {
+                metrics.mem = parsedMem;
+            } else if (rawVal === 'Unknown') {
+                metrics.mem = 'Unknown';
+            }
+        }
     });
     return metrics;
 }
@@ -283,13 +298,23 @@ function updateDashboard(metrics) {
     if (metrics.postIr !== undefined) mPostIr.textContent = metrics.postIr;
     
     if (metrics.time !== undefined && !isNaN(metrics.time)) {
-        mTime.textContent = metrics.time.toFixed(4);
+        if (metrics.unit === 'ns') {
+            mTime.textContent = Math.round(metrics.time);
+        } else {
+            mTime.textContent = metrics.time.toFixed(6);
+        }
     } else {
         mTime.textContent = '-';
     }
     
-    if (metrics.mem !== undefined && !isNaN(metrics.mem)) {
-        mMem.textContent = metrics.mem;
+    if (metrics.mem !== undefined) {
+        if (!isNaN(metrics.mem)) {
+            mMem.textContent = metrics.mem;
+        } else if (typeof metrics.mem === 'string' && metrics.mem === 'Unknown') {
+            mMem.textContent = 'Unknown';
+        } else {
+            mMem.textContent = '-';
+        }
     } else {
         mMem.textContent = '-';
     }

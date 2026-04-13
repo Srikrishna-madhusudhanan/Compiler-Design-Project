@@ -28,12 +28,22 @@ app.post('/api/compile', (req, res) => {
         if (f.endsWith('_interference.json') || f.endsWith('_cfg.json')) fs.unlinkSync(path.join(ROOT_DIR, f));
     });
 
-    let command = `${COMPILER_PATH} -O${optimizationLevel} ${useMetrics ? '--metrics' : ''} ${tempFile}`;
-    
+    let optFlag = `-O${optimizationLevel}`;
+    let metricsFlag = useMetrics ? '--metrics' : '';
+    const timeOutFile = path.join(ROOT_DIR, 'compiler_time.txt');
+
+    // Use /usr/bin/time to measure the compiler itself — real execution time + memory
+    const hasGnuTime = fs.existsSync('/usr/bin/time');
+    let command;
+    if (hasGnuTime && useMetrics) {
+        command = `/usr/bin/time -f "%e %M" -o "${timeOutFile}" ${COMPILER_PATH} ${optFlag} ${metricsFlag} "${tempFile}"`;
+    } else {
+        command = `${COMPILER_PATH} ${optFlag} ${metricsFlag} "${tempFile}"`;
+    }
+
     exec(command, { cwd: ROOT_DIR }, (error, stdout, stderr) => {
-        // Cleanup temp file
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-        
+
         let result = {
             stdout,
             stderr,
@@ -45,37 +55,56 @@ app.post('/api/compile', (req, res) => {
             ra_json: [],
             cfg_json: []
         };
-        
+
         const irFile = path.join(ROOT_DIR, 'ir.txt');
         if (fs.existsSync(irFile)) result.ir = fs.readFileSync(irFile, 'utf8');
-        
+
         const irOptFile = path.join(ROOT_DIR, 'ir_opt.txt');
         if (fs.existsSync(irOptFile)) result.ir_opt = fs.readFileSync(irOptFile, 'utf8');
-        
+
         const metricsFile = path.join(ROOT_DIR, 'compiler_metrics.txt');
-        if (fs.existsSync(metricsFile)) result.metrics = fs.readFileSync(metricsFile, 'utf8');
-        
+        if (fs.existsSync(metricsFile)) {
+            let metricsText = fs.readFileSync(metricsFile, 'utf8');
+
+            // Inject compiler-measured time+memory from /usr/bin/time output
+            if (hasGnuTime && useMetrics && fs.existsSync(timeOutFile)) {
+                try {
+                    const raw = fs.readFileSync(timeOutFile, 'utf8').trim();
+                    // /usr/bin/time -f "%e %M" => "0.12 3456"
+                    const match = raw.match(/^([\d.]+)\s+(\d+)/m);
+                    if (match) {
+                        const execTime = match[1];
+                        const execTimeNs = (parseFloat(execTime) * 1000000000).toFixed(0);
+                        const peakMem = match[2];
+                        // Replace or append into metrics file
+                        metricsText = metricsText.replace(/Execution time:.*\n?/, '');
+                        metricsText = metricsText.replace(/Peak memory usage:.*\n?/, '');
+                        metricsText = metricsText.replace(/==========================\n?/, '');
+                        metricsText += `Execution time:                         ${execTimeNs} ns\n`;
+                        metricsText += `Peak memory usage:                      ${peakMem} KB\n`;
+                        metricsText += `==========================\n`;
+                        fs.writeFileSync(metricsFile, metricsText);
+                    }
+                } catch (e) {}
+            }
+
+            result.metrics = fs.readFileSync(metricsFile, 'utf8');
+        }
+
         const astJsonFile = path.join(ROOT_DIR, 'ast.json');
         if (fs.existsSync(astJsonFile)) {
-            try {
-                result.ast_json = JSON.parse(fs.readFileSync(astJsonFile, 'utf8'));
-            } catch (e) {}
+            try { result.ast_json = JSON.parse(fs.readFileSync(astJsonFile, 'utf8')); } catch (e) {}
         }
-        
-        // Look for all _interference.json and _cfg.json files
+
         const files = fs.readdirSync(ROOT_DIR);
         files.forEach(file => {
             if (file.endsWith('_interference.json')) {
-                try {
-                    result.ra_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8')));
-                } catch (e) {}
+                try { result.ra_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8'))); } catch (e) {}
             } else if (file.endsWith('_cfg.json')) {
-                try {
-                    result.cfg_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8')));
-                } catch (e) {}
+                try { result.cfg_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8'))); } catch (e) {}
             }
         });
-        
+
         res.json(result);
     });
 });
