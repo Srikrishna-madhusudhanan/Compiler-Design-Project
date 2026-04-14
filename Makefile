@@ -31,7 +31,7 @@ setup:
 	@mkdir -p $(BUILD_DIR)
 
 parser: $(OBJS)
-	$(CC) $(CFLAGS) -DYYDEBUG=1 -o $(BUILD_DIR)/parser $(OBJS)
+	$(CC) $(CFLAGS) -DYYDEBUG=1 -o $(BUILD_DIR)/parser $(OBJS) -lc
 
 $(BUILD_DIR)/y.tab.c $(BUILD_DIR)/y.tab.h: $(SRC_DIR)/parser.y
 	$(BISON) -t -d -o $(BUILD_DIR)/y.tab.c $(SRC_DIR)/parser.y

@@ -63,6 +63,54 @@ void semantic_error(int line, const char *msg) {
     semantic_errors++;
 }
 
+/* Check if a type represents a void pointer (void*) */
+static int is_void_pointer(DataType type, int pointer_level) {
+    return type == TYPE_VOID && pointer_level > 0;
+}
+
+/* Check if two types are compatible, including implicit void* conversions.
+ * Returns 1 if types are compatible, 0 otherwise. */
+static int types_compatible(DataType t1, int p1, DataType t2, int p2) {
+    /* Exact match */
+    if (t1 == t2 && p1 == p2) return 1;
+    
+    /* One is void pointer, other is any pointer type - compatible */
+    if (is_void_pointer(t1, p1) && p2 > 0) return 1;
+    if (is_void_pointer(t2, p2) && p1 > 0) return 1;
+    
+    /* Both are non-void pointers to same base type - compatible */
+    if (p1 > 0 && p2 > 0 && t1 == t2) return 1;
+    
+    return 0;
+}
+
+/* Initialize built-in functions (malloc, free) in the global symbol table */
+static void init_builtin_functions() {
+    /* malloc: void* malloc(int) */
+    Symbol *malloc_sym = create_symbol("malloc", TYPE_VOID, SYM_FUNCTION, 0);
+    malloc_sym->pointer_level = 1;  /* Return type is void* */
+    malloc_sym->param_count = 1;
+    malloc_sym->param_types = malloc(sizeof(DataType) * 1);
+    malloc_sym->param_types[0] = TYPE_INT;
+    malloc_sym->param_is_array = malloc(sizeof(int) * 1);
+    malloc_sym->param_is_array[0] = 0;
+    malloc_sym->param_names = malloc(sizeof(char*) * 1);
+    malloc_sym->param_names[0] = strdup("size");
+    insert_symbol(malloc_sym);
+    
+    /* free: void free(void*) */
+    Symbol *free_sym = create_symbol("free", TYPE_VOID, SYM_FUNCTION, 0);
+    free_sym->pointer_level = 0;  /* Return type is void */
+    free_sym->param_count = 1;
+    free_sym->param_types = malloc(sizeof(DataType) * 1);
+    free_sym->param_types[0] = TYPE_VOID;
+    free_sym->param_is_array = malloc(sizeof(int) * 1);
+    free_sym->param_is_array[0] = 0;
+    free_sym->param_names = malloc(sizeof(char*) * 1);
+    free_sym->param_names[0] = strdup("ptr");
+    insert_symbol(free_sym);
+}
+
 const char* type_to_string(DataType t) {
     switch (t) {
         case TYPE_INT: return "int";
@@ -478,8 +526,10 @@ void analyze_declaration(ASTNode *node) {
 
     if (node->right) {
         analyze_node(node->right);
-        if (node->left->data_type != node->right->data_type)
+        if (!types_compatible(node->left->data_type, sym->pointer_level,
+                              node->right->data_type, node->right->pointer_level)) {
             semantic_error(node->line_number, "Type mismatch in initialization");
+        }
         
         if (node->right->type == NODE_CONST_INT) {
             if (sym->is_const) {
@@ -618,8 +668,10 @@ void analyze_assignment(ASTNode *node) {
         semantic_error(node->line_number, "Assignment to const variable");
     }
 
-    if (node->left->data_type != node->right->data_type)
+    if (!types_compatible(node->left->data_type, node->left->pointer_level,
+                          node->right->data_type, node->right->pointer_level)) {
         semantic_error(node->line_number, "Assignment type mismatch");
+    }
     node->data_type = node->left->data_type;
 }
 
@@ -820,7 +872,21 @@ void analyze_function_call(ASTNode *node) {
             semantic_error(node->line_number, "Too many arguments");
             break;
         }
-        if (arg->data_type != sym->param_types[i]) {
+        
+        /* Type compatibility check with void* implicit conversion support */
+        int param_pointer_level = 0;
+        if (i < sym->param_count) {
+            if (sym->param_types[i] == TYPE_VOID) {
+                /* For parameters, we assume void* if type is void and function likely uses it as pointer */
+                /* This is a heuristic; for built-ins like free, we treat void params as void* */
+                if (strcmp(sym->name, "free") == 0) {
+                    param_pointer_level = 1;
+                }
+            }
+        }
+        
+        if (!types_compatible(arg->data_type, arg->pointer_level,
+                              sym->param_types[i], param_pointer_level)) {
             if (!(i == 0 && sym->param_types[0] == TYPE_STRUCT && arg->data_type == TYPE_STRUCT)) {
                 semantic_error(node->line_number, "Argument type mismatch");
             }
@@ -831,6 +897,7 @@ void analyze_function_call(ASTNode *node) {
 
     if (i < sym->param_count) semantic_error(node->line_number, "Too few arguments");
     node->data_type = sym->type;
+    node->pointer_level = sym->pointer_level;  /* Set return type pointer level */
 }
 
 int analyze_return(ASTNode *node) {
@@ -1046,5 +1113,6 @@ int get_type_size(DataType t, int pointer_level, Symbol *struct_def) {
 
 void semantic_analyze(ASTNode *node) {
     if (!node) return;
+    init_builtin_functions();
     analyze_list(node);
 }

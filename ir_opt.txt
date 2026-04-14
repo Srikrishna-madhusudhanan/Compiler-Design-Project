@@ -1,7 +1,24 @@
 function main:
-  x$1 := 11
-  y$2 := 20
-  t0 := x$1 + y$2
-  result$3 := t0
-  return result$3
+  param 8
+  t0 := call malloc, 1
+  p$3 := t0
+  store t0[0] (scale 4) := 42
+  t1 := t0 + 4
+  store t1[0] (scale 4) := 99
+  t3 := load t0[0] (scale 4)
+  param .LC0
+  param t3
+  call printf, 2
+  t6 := load t1[0] (scale 4)
+  param .LC1
+  param t6
+  call printf, 2
+  t7 := load t0[0] (scale 4)
+  if t7 != 42 goto L2
+L0:
+  return 0
+L2:
+  param p$3
+  call free, 1
+  return 1
 

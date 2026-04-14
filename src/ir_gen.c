@@ -427,7 +427,44 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
             IROperand left = gen_expr(node->left, list);
             IROperand right = gen_expr(node->right, list);
             char *t = ir_new_temp();
-            ir_append(list, ir_make_binop(t, left, right, node->int_val, line));
+            
+            /* Handle pointer arithmetic scaling */
+            if ((node->int_val == '+' || node->int_val == '-') && 
+                (node->left->pointer_level > 0 || node->right->pointer_level > 0)) {
+                /* Pointer arithmetic: need to scale the offset by the type size */
+                IROperand scaled_right = right;
+                int scale = 1;
+                
+                if (node->left->pointer_level > 0) {
+                    /* Left is pointer, scale right operand */
+                    scale = get_type_size(node->left->data_type, 
+                                         node->left->pointer_level - 1,
+                                         node->left->struct_def);
+                } else if (node->right->pointer_level > 0) {
+                    /* Right is pointer (rare for + but possible), scale left operand */
+                    scale = get_type_size(node->right->data_type, 
+                                         node->right->pointer_level - 1,
+                                         node->right->struct_def);
+                    IROperand temp;
+                    temp = left;
+                    left = right;
+                    right = temp;
+                }
+                
+                if (scale != 1) {
+                    char *scaled_t = ir_new_temp();
+                    ir_append(list, ir_make_binop(scaled_t, right, ir_op_const(scale), '*', line));
+                    if (scaled_right.name) free(scaled_right.name);
+                    scaled_right = ir_op_name(scaled_t);
+                    free(scaled_t);
+                }
+                
+                ir_append(list, ir_make_binop(t, left, scaled_right, node->int_val, line));
+                if (scaled_right.name && scaled_right.name != right.name) free(scaled_right.name);
+            } else {
+                ir_append(list, ir_make_binop(t, left, right, node->int_val, line));
+            }
+            
             if (left.name) free(left.name);
             if (right.name) free(right.name);
             IROperand res = ir_op_name(t);
@@ -566,7 +603,8 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
             }
 
             /* Call */
-            int is_void = (node->data_type == TYPE_VOID);
+            /* A function returns void if its return type is TYPE_VOID with no pointer level */
+            int is_void = (node->data_type == TYPE_VOID && node->pointer_level == 0);
             IROperand res_op = ir_op_const(0);
             
             if (is_virtual) {
