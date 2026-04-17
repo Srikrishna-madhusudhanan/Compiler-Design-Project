@@ -213,6 +213,29 @@ IRInstr* ir_make_alloca(char *dst, IROperand size, int line) {
     return i;
 }
 
+IRInstr* ir_make_try_begin(char *catch_label, int line) {
+    IRInstr *i = calloc(1, sizeof(IRInstr));
+    i->kind = IR_TRY_BEGIN;
+    i->line = line;
+    i->label = catch_label ? strdup(catch_label) : NULL;
+    return i;
+}
+
+IRInstr* ir_make_try_end(int line) {
+    IRInstr *i = calloc(1, sizeof(IRInstr));
+    i->kind = IR_TRY_END;
+    i->line = line;
+    return i;
+}
+
+IRInstr* ir_make_throw(IROperand val, int line) {
+    IRInstr *i = calloc(1, sizeof(IRInstr));
+    i->kind = IR_THROW;
+    i->line = line;
+    i->src = ir_op_copy(&val);
+    return i;
+}
+
 /* --- List management --- */
 void ir_append(IRInstr **head, IRInstr *instr) {
     if (!instr) return;
@@ -396,6 +419,17 @@ void ir_print_instr(IRInstr *instr) {
             print_operand(&instr->src);
             printf("\n");
             break;
+        case IR_TRY_BEGIN:
+            printf("  try_begin %s\n", instr->label);
+            break;
+        case IR_TRY_END:
+            printf("  try_end\n");
+            break;
+        case IR_THROW:
+            printf("  throw ");
+            print_operand(&instr->src);
+            printf("\n");
+            break;
     }
 }
 
@@ -487,6 +521,16 @@ int ir_snprint_instr(char *buf, size_t size, IRInstr *instr) {
             break;
         case IR_ALLOCA:
             n += snprintf(buf + n, size - n, "  %s := alloca ", instr->result);
+            n += snprint_operand(buf + n, size - n, &instr->src);
+            break;
+        case IR_TRY_BEGIN:
+            n += snprintf(buf + n, size - n, "  try_begin %s", instr->label);
+            break;
+        case IR_TRY_END:
+            n += snprintf(buf + n, size - n, "  try_end");
+            break;
+        case IR_THROW:
+            n += snprintf(buf + n, size - n, "  throw ");
             n += snprint_operand(buf + n, size - n, &instr->src);
             break;
     }
@@ -610,6 +654,18 @@ void ir_export_to_file(IRProgram *prog, const char *filename) {
                     else fprintf(f, "%s", i->src.name);
                     fprintf(f, "\n");
                     break;
+                case IR_TRY_BEGIN:
+                    fprintf(f, "  try_begin %s\n", i->label);
+                    break;
+                case IR_TRY_END:
+                    fprintf(f, "  try_end\n");
+                    break;
+                case IR_THROW:
+                    fprintf(f, "  throw ");
+                    if (i->src.is_const) fprintf(f, "%d", i->src.const_val);
+                    else fprintf(f, "%s", i->src.name);
+                    fprintf(f, "\n");
+                    break;
             }
         }
         fprintf(f, "\n");
@@ -674,6 +730,14 @@ void ir_free_instr(IRInstr *instr) {
                 break;
             case IR_ALLOCA:
                 if (instr->result) free(instr->result);
+                if (instr->src.name) free(instr->src.name);
+                break;
+            case IR_TRY_BEGIN:
+                if (instr->label) free(instr->label);
+                break;
+            case IR_TRY_END:
+                break;
+            case IR_THROW:
                 if (instr->src.name) free(instr->src.name);
                 break;
         }

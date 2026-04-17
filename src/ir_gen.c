@@ -998,6 +998,49 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
             break;
         }
 
+        case NODE_TRY: {
+            char *L_catch = ir_new_label();
+            char *L_end = ir_new_label();
+
+            /* try_begin registers the catch label */
+            ir_append(list, ir_make_try_begin(L_catch, line));
+
+            /* Generate try body */
+            gen_stmt(node->body, list);
+
+            /* try_end unregisters the catch label */
+            ir_append(list, ir_make_try_end(line));
+            ir_append(list, ir_make_goto(L_end, line));
+
+            /* Catch block label */
+            ir_append(list, ir_make_label(L_catch, line));
+
+            /* Generate code for catch blocks */
+            for (ASTNode *c = node->left; c; c = c->next) {
+                gen_stmt(c, list);
+            }
+
+            ir_append(list, ir_make_label(L_end, line));
+
+            free(L_catch);
+            free(L_end);
+            break;
+        }
+
+        case NODE_CATCH: {
+            /* For now, just generate the catch block body */
+            /* We could add logic to check exception type here if needed */
+            gen_stmt(node->body, list);
+            break;
+        }
+
+        case NODE_THROW: {
+            IROperand val = node->left ? gen_expr(node->left, list) : ir_op_const(0);
+            ir_append(list, ir_make_throw(val, line));
+            if (val.name) free(val.name);
+            break;
+        }
+
         default:
             /* Expression statement (e.g. foo(); x+1;) */
             (void)gen_expr(node, list);

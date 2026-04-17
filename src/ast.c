@@ -40,6 +40,9 @@ const char* node_type_to_string(NodeType type) {
         case NODE_PRE_DEC: return "PRE_DEC";
         case NODE_POST_INC: return "POST_INC";
         case NODE_POST_DEC: return "POST_DEC";
+        case NODE_TRY: return "TRY";
+        case NODE_CATCH: return "CATCH";
+        case NODE_THROW: return "THROW";
         default: return "UNKNOWN";
     }
 }
@@ -409,6 +412,26 @@ ASTNode* create_scanf_node(ASTNode *fmt, ASTNode *args) {
     return node;
 }
 
+ASTNode* create_try_node(ASTNode *try_body, ASTNode *catch_blocks) {
+    ASTNode *node = create_node(NODE_TRY);
+    node->body = try_body;
+    node->left = catch_blocks; // List of NODE_CATCH
+    return node;
+}
+
+ASTNode* create_catch_node(ASTNode *expr, ASTNode *catch_body) {
+    ASTNode *node = create_node(NODE_CATCH);
+    node->left = expr;  // Catch type/expression
+    node->body = catch_body;
+    return node;
+}
+
+ASTNode* create_throw_node(ASTNode *expr) {
+    ASTNode *node = create_node(NODE_THROW);
+    node->left = expr;
+    return node;
+}
+
 ASTNode* append_node(ASTNode *head, ASTNode *new_node) {
     if (!new_node) return head;
 
@@ -633,6 +656,26 @@ void print_ast(ASTNode *node, int level) {
             break;
         case NODE_POST_DEC:
             printf("PostDec\n");
+            print_ast(node->left, level + 1);
+            break;
+        case NODE_TRY:
+            printf("Try\n");
+            print_indent(level + 1); printf("Body:\n");
+            print_ast(node->body, level + 2);
+            print_indent(level + 1); printf("Catch Blocks:\n");
+            print_ast(node->left, level + 2);
+            break;
+        case NODE_CATCH:
+            printf("Catch\n");
+            if (node->left) {
+                print_indent(level + 1); printf("Type/Expr:\n");
+                print_ast(node->left, level + 2);
+            }
+            print_indent(level + 1); printf("Body:\n");
+            print_ast(node->body, level + 2);
+            break;
+        case NODE_THROW:
+            printf("Throw\n");
             print_ast(node->left, level + 1);
             break;
         default:
