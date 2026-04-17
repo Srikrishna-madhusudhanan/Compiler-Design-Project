@@ -13,7 +13,7 @@
   "children": [
 {
   "type": "VAR_DECL",
-  "value": "p",
+  "value": "total",
   "children": [
 {
   "type": "TYPE",
@@ -22,155 +22,143 @@
   ]
 },
 {
-  "type": "FUNC_CALL",
-  "value": "malloc",
-  "children": [
-{
-  "type": "VAR",
-  "value": "malloc",
-  "children": [
-
-  ]
-},
-{
   "type": "INT",
-  "value": 8,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ],
-  "next": {
-  "type": "ASSIGN",
-  "children": [
-{
-  "type": "UN_OP",
-  "value": "*",
-  "children": [
-{
-  "type": "VAR",
-  "value": "p",
-  "children": [
-
-  ]
-}
-  ]
-},
-{
-  "type": "INT",
-  "value": 42,
+  "value": 0,
   "children": [
 
   ]
 }
   ],
   "next": {
-  "type": "ASSIGN",
+  "type": "VAR_DECL",
+  "value": "i",
   "children": [
 {
-  "type": "UN_OP",
-  "value": "*",
+  "type": "TYPE",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 0,
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
+  "type": "WHILE",
   "children": [
 {
   "type": "BIN_OP",
-  "value": "+",
+  "value": "<",
   "children": [
 {
   "type": "VAR",
-  "value": "p",
+  "value": "i",
   "children": [
 
   ]
 },
 {
   "type": "INT",
-  "value": 1,
+  "value": 160,
   "children": [
 
-  ]
-}
   ]
 }
   ]
 },
-{
-  "type": "INT",
-  "value": 99,
-  "children": [
-
-  ]
-}
-  ],
-  "next": {
-  "type": "PRINTF",
-  "children": [
-{
-  "type": "STRING",
-  "value": "Value allocated: %d\n",
-  "children": [
-
-  ]
-},
-{
-  "type": "UN_OP",
-  "value": "*",
-  "children": [
-{
-  "type": "VAR",
-  "value": "p",
-  "children": [
-
-  ]
-}
-  ]
-}
-  ],
-  "next": {
-  "type": "PRINTF",
-  "children": [
-{
-  "type": "STRING",
-  "value": "Next value: %d\n",
-  "children": [
-
-  ]
-},
-{
-  "type": "UN_OP",
-  "value": "*",
-  "children": [
-{
-  "type": "BIN_OP",
-  "value": "+",
-  "children": [
-{
-  "type": "VAR",
-  "value": "p",
-  "children": [
-
-  ]
-},
-{
-  "type": "INT",
-  "value": 1,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ]
-}
-  ],
-  "next": {
-  "type": "IF",
-  "children": [
 {
   "type": "BLOCK",
   "children": [
 {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "total",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "total",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 1,
+  "children": [
+
+  ]
+}
+  ]
+}
+  ],
+  "next": {
+  "type": "ASSIGN",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "BIN_OP",
+  "value": "+",
+  "children": [
+{
+  "type": "VAR",
+  "value": "i",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 1,
+  "children": [
+
+  ]
+}
+  ]
+}
+  ]
+}
+}
+  ]
+}
+  ],
+  "next": {
+  "type": "PRINTF",
+  "children": [
+{
+  "type": "STRING",
+  "value": "total=%d",
+  "children": [
+
+  ]
+},
+{
+  "type": "VAR",
+  "value": "total",
+  "children": [
+
+  ]
+}
+  ],
+  "next": {
   "type": "RETURN",
   "children": [
 {
@@ -181,69 +169,6 @@
   ]
 }
   ]
-}
-  ]
-},
-{
-  "type": "BIN_OP",
-  "value": "==",
-  "children": [
-{
-  "type": "UN_OP",
-  "value": "*",
-  "children": [
-{
-  "type": "VAR",
-  "value": "p",
-  "children": [
-
-  ]
-}
-  ]
-},
-{
-  "type": "INT",
-  "value": 42,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ],
-  "next": {
-  "type": "FUNC_CALL",
-  "value": "free",
-  "children": [
-{
-  "type": "VAR",
-  "value": "free",
-  "children": [
-
-  ]
-},
-{
-  "type": "VAR",
-  "value": "p",
-  "children": [
-
-  ]
-}
-  ],
-  "next": {
-  "type": "RETURN",
-  "children": [
-{
-  "type": "INT",
-  "value": 1,
-  "children": [
-
-  ]
-}
-  ]
-}
-}
-}
 }
 }
 }

@@ -230,6 +230,24 @@ static void emit_callee_restores(FILE *out, RegAllocResult *ra, int frame_size) 
     }
 }
 
+static void scan_all_offsets(IRFunc *func) {
+    IRInstr *instr = func->instrs;
+    while (instr) {
+        if (instr->result && strlen(instr->result) > 0) get_offset(instr->result);
+        if (instr->src.name) get_offset(instr->src.name);
+        if (instr->left.name) get_offset(instr->left.name);
+        if (instr->right.name) get_offset(instr->right.name);
+        if (instr->unop_src.name) get_offset(instr->unop_src.name);
+        if (instr->if_left.name) get_offset(instr->if_left.name);
+        if (instr->if_right.name) get_offset(instr->if_right.name);
+        if (instr->base.name) get_offset(instr->base.name);
+        if (instr->index.name) get_offset(instr->index.name);
+        if (instr->store_val.name) get_offset(instr->store_val.name);
+        instr = instr->next;
+    }
+}
+
+
 static int calculate_frame_size(IRFunc *func, RegAllocResult *ra) {
     int locals_size = 0;
     Symbol *fsym = lookup(func->name);
@@ -329,7 +347,10 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
         cur_ra = (ra_results && ra_results[func_idx]) ? ra_results[func_idx] : NULL;
         current_codegen_scope = fsym ? fsym->scope : NULL;
 
+        /* Pre-scan all instructions to ensure all temps have offsets before frame calculation */
+        scan_all_offsets(func);
         int frame_size = calculate_frame_size(func, cur_ra);
+
 
         fprintf(out, "%s:\n", func->name);
 
@@ -341,9 +362,12 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
         emit_callee_saves(out, cur_ra, frame_size);
         fprintf(out, "  addi s0, sp, %d\n\n", frame_size);
 
-        /* --- Tail recursion entry point (only if function has tail calls) --- */
+        /* --- Labels for exit and tail recursion --- */
         char tail_entry_label[128];
+        char exit_label[128];
         snprintf(tail_entry_label, sizeof(tail_entry_label), "%s_tail_entry", func->name);
+        snprintf(exit_label, sizeof(exit_label), ".L_exit_%s", func->name);
+
         if (has_tail_calls(func)) {
             fprintf(out, "  # Tail recursion entry point\n");
             fprintf(out, "%s:\n\n", tail_entry_label);
@@ -551,14 +575,7 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     if (instr->src.name || instr->src.is_const)
                         load_operand(out, instr->src, "a0");
                     
-                    /* Restore Callee-Saves and Frame Pointers */
-                    /* Re-adjust sp to fixed frame start in case of VLA */
-                    fprintf(out, "  addi sp, s0, -%d\n", frame_size);
-                    emit_callee_restores(out, cur_ra, frame_size);
-                    fprintf(out, "  ld ra, %d(sp)\n", frame_size - 8);
-                    fprintf(out, "  ld s0, %d(sp)\n", frame_size - 16);
-                    fprintf(out, "  addi sp, sp, %d\n", frame_size);
-                    fprintf(out, "  jr ra\n");
+                    fprintf(out, "  j %s\n", exit_label);
                     break;
 
                 default:
@@ -568,8 +585,9 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
             instr = instr->next;
         }
 
-        /* --- Default epilogue (reached only if no explicit return) --- */
-        fprintf(out, "\n  # --- Default Epilogue ---\n");
+        /* --- Centralized Epilogue --- */
+        fprintf(out, "\n%s:\n", exit_label);
+        fprintf(out, "  # --- Epilogue ---\n");
         fprintf(out, "  addi sp, s0, -%d\n", frame_size);
         emit_callee_restores(out, cur_ra, frame_size);
         fprintf(out, "  ld ra, %d(sp)\n", frame_size - 8);

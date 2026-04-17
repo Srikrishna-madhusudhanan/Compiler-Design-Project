@@ -46,9 +46,14 @@ typedef struct Symbol {
     int is_class;
     /* Base class symbol for inheritance */
     struct Symbol *base_class;
+    /* Inheritance visibility for class definitions (0=public, 1=private, 2=protected) */
+    int inheritance_modifier;
 
     /* Access modifier (0=public, 1=private, 2=protected) */
     int access_modifier;
+
+    /* For member symbols: the struct where this member is defined (for access control) */
+    struct Symbol *defining_struct;
 
     /* For member symbols (fields): offset within the struct */
     int struct_offset;

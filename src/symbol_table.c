@@ -87,8 +87,15 @@ Symbol *create_symbol(char *name, DataType type,
     sym->struct_def = NULL;
     sym->struct_size = 0;
     sym->members = NULL;
+    sym->virtual_methods = NULL;
     sym->struct_offset = 0;
     sym->frame_offset = 0;
+    sym->base_class = NULL;
+    sym->inheritance_modifier = 0;
+    sym->access_modifier = 0;
+    sym->defining_struct = NULL;
+    sym->vtable_size = 0;
+    sym->is_class = 0;
 
     /* New fields */
     sym->pointer_level = 0;

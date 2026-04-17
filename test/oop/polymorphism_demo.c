@@ -5,7 +5,7 @@ public:
     }
 };
 
-class Derived : Base {
+class Derived : public Base {
 public:
     void show(){
         printf("Derived class\n");
