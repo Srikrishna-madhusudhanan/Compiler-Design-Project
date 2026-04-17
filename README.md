@@ -1,117 +1,175 @@
-# Compiler From C-Subset to RISC-V
+# 🚀 PaniniC — C-Subset to RISC-V Compiler
 
-This project implements a C-subset compiler developed as part of our Compiler Design Lab course.
+A full compiler pipeline from a C-subset language to RISC-V assembly, with a premium interactive visualization dashboard. Developed as part of the Compiler Design Lab course.
 
-Our project is to develop a compiler that translates programs written in a custom language (whose allowed instructions are a subset of the C programming language) into executable RISC-V assembly code. We will also apply selected optimizations to improve the efficiency of the generated code.
+## Pipeline Overview
 
-The implementation follows the classical compiler pipeline:
-
-- Lexical Analysis
-- Syntax Analysis (Parsing)
-- Semantic Analysis
-- Intermediate Representation (IR)
-- Code Generation (RISC-V)
-- Basic Optimizations
-
-
-The compiler generates a simple three-address IR from the AST. After semantic analysis, run the following:
-
-```bash
-make clean
-make
-./build/parser < ./test/<source.c>
+```
+Source Code → Lexer → Parser → Semantic Analysis → IR → Optimization
+           → Instruction Scheduling → Register Allocation → RISC-V Codegen
 ```
 
-IR is printed to stdout and exported to `ir.txt`. Run validation:
+---
 
+## Quick Start
+
+### 1. Build the Compiler
+```bash
+make clean && make
+```
+
+### 2. Compile a Program
+```bash
+./build/parser < test/basics/minimal_main.c
+```
+
+### 3. Run All Tests
 ```bash
 ./run_tests.sh
-```
-
-Run QEMU-backed regression tests:
-
-```bash
+# or with QEMU:
 ./scripts/run_qemu_tests.sh
 ```
 
-Compile and run a single C test with QEMU via the helper pipeline:
-
+### 4. Compile & Run a Single File with QEMU
 ```bash
 ./scripts/qemu_run.sh test/complex/factorial_tail_recursive.c "7\n"
+# Optional flags:
+#   --metrics   → save timing/memory to compiler_metrics.txt
+#   -O0/-O1/-O2 → optimization level
 ```
 
-You can also add these flags to the above command:
-- Include metrics information (which will be stored in `compiler_metrics.txt`) using `--metrics`.
-- Choose the optimization level (0, 1 or 2): `-O0`, `-O1`, `-O2`.
-## RISC-V Toolchain (Assembler & Linker)
+---
 
-Our project includes a custom RISC-V assembler (**rvas**) and a static linker (**rvld**) that work together to produce executables.
+## 🎨 Interactive Visualization Dashboard
 
-### 1. Build the Toolchain
+PaniniC ships with a modern web GUI that animates every stage of compilation.
+
+### Setup
+
 ```bash
+# Install dependencies (one-time)
+cd gui && npm install && cd ..
+
+# Build the compiler
+make all
+
+# Start the dashboard
+cd gui && npm start
+```
+
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+
+---
+
+### Using the Dashboard
+
+#### Step 1 — Write or Load Code
+- Type directly in the **Source Code** editor on the left, or
+- Select a built-in example from the **Load Example…** dropdown in the header.
+
+#### Step 2 — Choose Optimization Level
+- Use the **O0 / O1 / O2** dropdown in the header.
+- Use **O0** to see more variables survive into Register Allocation.
+
+#### Step 3 — Compile
+- Click **Compile & Viz**.
+- The compiler runs, the **Terminal Output** panel shows live progress, and the following are populated automatically:
+  - **Intermediate Representation** panel (left)
+  - **Control Flow Graph** (center)
+  - **Performance Metrics** dashboard with pre/post-opt IR counts
+  - **Register Usage Map** (right panel, bottom)
+
+---
+
+### Visualizations
+
+#### 📐 AST Visualization
+- Click **Animate Build** in the AST panel (top center).
+- Nodes appear one by one, building the Abstract Syntax Tree.
+
+#### 🌐 Control Flow Graph
+- Auto-renders after compilation showing basic blocks and control edges.
+
+#### ⚡ Register Allocation (Chaitin-Briggs)
+Located in the **right pane**, top panel.
+
+1. Click **Compile & Viz** first.
+2. Click **Animate Trace**.
+3. Watch the animation:
+   - **Simplify phase**: nodes are pushed onto the stack (dimmed in the graph)
+   - **Select phase**: nodes are popped and colored by assigned physical register
+   - **Spilled nodes** appear in red
+4. The interference graph shows all variables as glowing neon nodes.
+5. Hover over a node to see its register assignment.
+
+> **Tip**: Click the **▢** (maximize) button on the panel header to expand it full-screen.
+
+#### 🗓 Instruction Scheduling (Dependency DAG)
+Located in the **right pane**, middle panel (scroll down).
+
+1. Click **Compile & Viz** first.
+2. Click **Animate Sched**.
+3. The dependency DAG appears (Top-Down hierarchy), then nodes light up in scheduling order:
+
+| Color | Meaning |
+|-------|---------|
+| 🟠 Orange | Critical path — must schedule first |
+| 🟣 Purple | High priority |
+| 🔵 Blue | Mid priority |
+| 🟢 Green | Low priority |
+
+4. Dependency arrows glow in the matching color as each instruction is selected.
+5. The **Terminal** logs each scheduled instruction with its priority tier.
+
+#### 📊 Performance Metrics
+- Auto-populated after compilation: pre/post-opt IR counts, exec time (ns), peak memory (KB).
+- Bar chart compares pre- vs post-optimization instruction counts.
+
+---
+
+## 🔧 RISC-V Toolchain (rvas + rvld)
+
+PaniniC includes a custom assembler and static linker.
+
+```bash
+# Build both tools
 make toolchain
-```
-This builds `tools/rvas/rvas` and `tools/rvld/rvld`.
 
-### 2. Assemble and Link
-To manually convert your assembly to an executable:
-
-```bash
-# Assemble .s to .o
+# Assemble
 ./tools/rvas/rvas -o program.o program.s
 
-# Link .o files to an executable
+# Link
 ./tools/rvld/rvld -o program program.o tools/rvld/tests/crt0.o
-```
 
-### 3. Run with QEMU
-```bash
+# Run via QEMU
 qemu-riscv64 ./program
+
+# Run linker test suite
+cd tools/rvld/tests && ./run_tests.sh
 ```
 
-### Integrated Test Suite
-We have provided comprehensive tests for the linker, including control flow, bubble sort, and OOP polymorphism.
-```bash
-# Run all linker verification tests
-cd tools/rvld/tests
-./run_tests.sh
+---
+
+## ⚠️ Exception Handling
+
+PaniniC supports `try`, `catch`, and `throw` statements compiled down to RISC-V via `setjmp`/`longjmp`.
+
+```c
+try {
+    throw 42;
+} catch (int e) {
+    // handle e
+}
 ```
 
+See `test/exception_test.c` for examples.
 
-## Interactive Visualization Dashboard (PaniniC)
-
-PaniniC comes with a modern, interactive web-based GUI to visualize the compilation process, performance metrics, and register allocation.
-
-### Features
-- **Live Code Editor**: Write and compile code directly from the browser.
-- **AST Visualization**: Animate the construction of the Abstract Syntax Tree.
-- **Register Allocation Animation**: Visualize the graph-coloring and simplification phases.
-- **Performance Dashboards**: Real-time charts for instruction counts, execution time, and memory usage.
-- **Resizable Interface**: Customize your workspace with adjustable panes.
-
-### How to Run
-1. **Ensure dependencies are installed**:
-   ```bash
-   cd gui
-   npm install
-   cd ..
-   ```
-2. **Build the compiler**:
-   ```bash
-   make all
-   ```
-3. **Start the GUI server**:
-   ```bash
-   node gui/server.js
-   ```
-4. **Access the dashboard**:
-   Open [http://localhost:3000](http://localhost:3000) in your web browser.
-
-> [!TIP]
-> To see detailed Register Allocation animations, use the **-O0 (No Optimization)** setting in the GUI, as aggressive optimizations may remove variables in simpler programs.
-
+---
 
 ## Meet the Team
-- Adithya Ananth (CS23B001)
-- Srikrishna Madhusudhanan (CS23B056)
-- Sudhanva Bharadwaj B M (CS23B051)
+
+| Name | Roll No |
+|------|---------|
+| Adithya Ananth | CS23B001 |
+| Srikrishna Madhusudhanan | CS23B056 |
+| Sudhanva Bharadwaj B M | CS23B051 |
