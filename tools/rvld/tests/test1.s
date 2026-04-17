@@ -1,5 +1,6 @@
-.globl _start
-_start:
+.globl main
+main:
+
     li a0, 42
     li a7, 93
     # ecall raw encoding

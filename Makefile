@@ -26,6 +26,12 @@ all: setup parser
 rvas:
 	$(MAKE) -C tools/rvas
 
+rvld:
+	$(MAKE) -C tools/rvld
+
+toolchain: rvas rvld
+
+
 # Ensure build directory exists
 setup:
 	@mkdir -p $(BUILD_DIR)
@@ -50,3 +56,5 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 clean:
 	rm -rf $(BUILD_DIR) ast.dot ir.txt ir_opt.txt output.s compiler_metrics.txt
+	$(MAKE) -C tools/rvas clean
+	$(MAKE) -C tools/rvld clean

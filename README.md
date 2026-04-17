@@ -43,6 +43,39 @@ Compile and run a single C test with QEMU via the helper pipeline:
 You can also add these flags to the above command:
 - Include metrics information (which will be stored in `compiler_metrics.txt`) using `--metrics`.
 - Choose the optimization level (0, 1 or 2): `-O0`, `-O1`, `-O2`.
+## RISC-V Toolchain (Assembler & Linker)
+
+Our project includes a custom RISC-V assembler (**rvas**) and a static linker (**rvld**) that work together to produce executables.
+
+### 1. Build the Toolchain
+```bash
+make toolchain
+```
+This builds `tools/rvas/rvas` and `tools/rvld/rvld`.
+
+### 2. Assemble and Link
+To manually convert your assembly to an executable:
+
+```bash
+# Assemble .s to .o
+./tools/rvas/rvas -o program.o program.s
+
+# Link .o files to an executable
+./tools/rvld/rvld -o program program.o tools/rvld/tests/crt0.o
+```
+
+### 3. Run with QEMU
+```bash
+qemu-riscv64 ./program
+```
+
+### Integrated Test Suite
+We have provided comprehensive tests for the linker, including control flow, bubble sort, and OOP polymorphism.
+```bash
+# Run all linker verification tests
+cd tools/rvld/tests
+./run_tests.sh
+```
 
 
 ## Interactive Visualization Dashboard (PaniniC)
