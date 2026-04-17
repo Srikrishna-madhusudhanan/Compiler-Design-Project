@@ -36,6 +36,22 @@
 extern const char *RA_REG_NAMES[RA_NUM_REGS]; /* defined in reg_alloc.c */
 
 /* -----------------------------------------------------------------------
+ * Tracing structures for visualization
+ * ----------------------------------------------------------------------- */
+typedef struct {
+    int instr_idx;
+    char *asm_line;
+    char **live_vars;
+    int count;
+} InstrLiveness;
+
+typedef struct {
+    int node_idx;
+    int degree;
+    int is_potential_spill;
+} SimplifyStep;
+
+/* -----------------------------------------------------------------------
  * Interference graph node
  * ----------------------------------------------------------------------- */
 typedef struct IGNode {
@@ -62,6 +78,14 @@ typedef struct {
     int     count;        /* number of nodes                               */
     int     cap;          /* allocated capacity                            */
     char   *func_name;    /* owning function (for DOT labels)              */
+
+    /* Tracing data */
+    InstrLiveness *liveness_trace;
+    int            trace_count;
+    int            trace_cap;
+
+    SimplifyStep  *simplify_trace;
+    int            simplify_trace_count;
 } InterferenceGraph;
 
 /* -----------------------------------------------------------------------

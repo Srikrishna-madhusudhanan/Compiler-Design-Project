@@ -31,10 +31,6 @@ const char *RA_REG_NAMES[RA_NUM_REGS] = {
 
 /* First callee-saved index is defined in reg_alloc.h as RA_FIRST_CALLEE_SAVED */
 
-/* -----------------------------------------------------------------------
- * Interference Graph helpers
- * ----------------------------------------------------------------------- */
-
 /* Find or create a node for the given variable name. Returns node index. */
 static int ig_get_or_add(InterferenceGraph *ig, const char *name) {
     /* Search existing nodes */
@@ -87,6 +83,17 @@ static void ig_free(InterferenceGraph *ig) {
     }
     free(ig->nodes);
     free(ig->func_name);
+
+    if (ig->liveness_trace) {
+        for (int i = 0; i < ig->trace_count; i++) {
+            free(ig->liveness_trace[i].asm_line);
+            for (int j = 0; j < ig->liveness_trace[i].count; j++) free(ig->liveness_trace[i].live_vars[j]);
+            free(ig->liveness_trace[i].live_vars);
+        }
+        free(ig->liveness_trace);
+    }
+    if (ig->simplify_trace) free(ig->simplify_trace);
+
     free(ig);
 }
 
@@ -150,6 +157,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
 
     /* Walk each basic block */
     BasicBlock *bb = cfg->blocks;
+    int instr_idx = 0;
     while (bb) {
         /* Count instructions in this BB */
         int cnt = 0;
@@ -177,18 +185,30 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
         /* Copy live_out into our working live set */
         for (int i = 0; i < bb->live_out_count; i++) {
             if (!is_allocatable(bb->live_out[i], fsym ? fsym->scope : NULL)) continue;
-            /* Ensure node exists */
             ig_get_or_add(ig, bb->live_out[i]);
-            /* Add to live set */
             live = realloc(live, sizeof(char*) * (live_count + 1));
-            live[live_count++] = bb->live_out[i];
+            live[live_count++] = strdup(bb->live_out[i]);
         }
 
         /* Walk instructions backward */
         for (int i = cnt - 1; i >= 0; i--) {
             IRInstr *instr = arr[i];
 
-
+            /* Capture liveness BEFORE definition (which is the live set at this instruction) */
+            if (ig->trace_count == ig->trace_cap) {
+                ig->trace_cap = ig->trace_cap ? ig->trace_cap * 2 : 64;
+                ig->liveness_trace = realloc(ig->liveness_trace, sizeof(InstrLiveness) * ig->trace_cap);
+            }
+            InstrLiveness *entry = &ig->liveness_trace[ig->trace_count++];
+            entry->instr_idx = instr_idx + i;
+            entry->count = live_count;
+            entry->live_vars = malloc(sizeof(char*) * live_count);
+            for(int k=0; k<live_count; k++) entry->live_vars[k] = strdup(live[k]);
+            
+            /* Format a string for the instruction for visualization */
+            char buf[128];
+            ir_snprint_instr(buf, sizeof(buf), instr);
+            entry->asm_line = strdup(buf);
 
             /* --- Add interference edges at the definition point --- */
             if (instr->result && is_allocatable(instr->result, fsym ? fsym->scope : NULL)) {
@@ -201,6 +221,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
                 /* Remove result from live set (it's defined here) */
                 for (int j = 0; j < live_count; j++) {
                     if (strcmp(live[j], instr->result) == 0) {
+                        free(live[j]);
                         live[j] = live[--live_count];
                         break;
                     }
@@ -226,6 +247,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
                                        ops[nops++] = &instr->store_val; break;
                 case IR_CALL_INDIRECT: ops[nops++] = &instr->base; break;
                 case IR_ALLOCA:        ops[nops++] = &instr->src; break;
+                case IR_THROW:         ops[nops++] = &instr->src; break;
                 default: break;
             }
             for (int j = 0; j < nops; j++) {
@@ -238,7 +260,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
                     if (strcmp(live[k], ops[j]->name) == 0) { found = 1; break; }
                 if (!found) {
                     live = realloc(live, sizeof(char*) * (live_count + 1));
-                    live[live_count++] = ops[j]->name;
+                    live[live_count++] = strdup(ops[j]->name);
                 }
             }
 
@@ -251,8 +273,10 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
             }
         }
 
+        instr_idx += cnt;
         free(arr);
-        free(live); /* names are owned by BB live sets, just free the array */
+        for(int k=0; k<live_count; k++) free(live[k]);
+        free(live);
         bb = bb->next;
     }
 
@@ -303,6 +327,13 @@ static int *simplify(InterferenceGraph *ig, int *stack_size) {
             if (best == -1) break; /* shouldn't happen */
             found = best;
         }
+
+        /* Record simplification step */
+        ig->simplify_trace = realloc(ig->simplify_trace, sizeof(SimplifyStep) * (ig->simplify_trace_count + 1));
+        SimplifyStep *step = &ig->simplify_trace[ig->simplify_trace_count++];
+        step->node_idx = found;
+        step->degree = deg[found];
+        step->is_potential_spill = (deg[found] >= RA_NUM_REGS);
 
         /* Push onto stack and mark removed */
         stack[top++] = found;
@@ -601,18 +632,20 @@ static RegAllocResult *allocate_function(IRFunc *f) {
     /* Phase 6: export DOT and JSON (one per function, last round's graph) */
     char dot_path[128];
     char json_path[128];
+    char cfg_path[128];
     snprintf(dot_path, sizeof(dot_path), "%s_interference.dot", f->name);
     snprintf(json_path, sizeof(json_path), "%s_interference.json", f->name);
+    snprintf(cfg_path, sizeof(cfg_path), "%s_cfg.json", f->name);
     
-    /* We need the stack from the last round where n_spills was determined but we broke.
-       Actually, simplify is called inside the loop. To get the final stack, 
-       we should run simplify one last time on the final graph if we want to show it.
-       Or just move the export inside the loop. 
-       Actually, if n_spills == 0, the coloring is final.
-    */
     int final_stack_size;
     int *final_stack = simplify(ig, &final_stack_size);
     
+    // Refresh CFG for final export (though it shouldn't have changed much)
+    CFG *final_cfg = build_cfg(f);
+    compute_liveness(final_cfg);
+    export_cfg_to_json(final_cfg, cfg_path);
+    free_cfg(final_cfg);
+
     reg_alloc_export_dot(ig, res, dot_path);
     reg_alloc_export_json(ig, res, final_stack, final_stack_size, json_path);
 
@@ -785,7 +818,35 @@ void reg_alloc_export_json(InterferenceGraph *ig, RegAllocResult *res,
     for (int i = 0; i < stack_size; i++) {
         fprintf(fp, "%d%s", stack[i], (i == stack_size - 1) ? "" : ", ");
     }
-    fprintf(fp, "]\n");
+    fprintf(fp, "],\n");
+
+    /* Register Names */
+    fprintf(fp, "  \"reg_names\": [");
+    for (int i = 0; i < RA_NUM_REGS; i++) {
+        fprintf(fp, "\"%s\"%s", RA_REG_NAMES[i], (i == RA_NUM_REGS - 1) ? "" : ", ");
+    }
+    fprintf(fp, "],\n");
+
+    /* Simplify History */
+    fprintf(fp, "  \"simplify_history\": [\n");
+    for (int i = 0; i < ig->simplify_trace_count; i++) {
+        fprintf(fp, "    {\"node_idx\": %d, \"degree\": %d, \"potential_spill\": %d}%s\n",
+                ig->simplify_trace[i].node_idx, ig->simplify_trace[i].degree, 
+                ig->simplify_trace[i].is_potential_spill, (i == ig->simplify_trace_count - 1) ? "" : ",");
+    }
+    fprintf(fp, "  ],\n");
+
+    /* Liveness Trace */
+    fprintf(fp, "  \"liveness_history\": [\n");
+    for (int i = 0; i < ig->trace_count; i++) {
+        fprintf(fp, "    {\"idx\": %d, \"instr\": \"%s\", \"live\": [", 
+                ig->liveness_trace[i].instr_idx, ig->liveness_trace[i].asm_line);
+        for (int j = 0; j < ig->liveness_trace[i].count; j++) {
+            fprintf(fp, "\"%s\"%s", ig->liveness_trace[i].live_vars[j], (j == ig->liveness_trace[i].count - 1) ? "" : ", ");
+        }
+        fprintf(fp, "]}%s\n", (i == ig->trace_count - 1) ? "" : ",");
+    }
+    fprintf(fp, "  ]\n");
     fprintf(fp, "}\n");
     fclose(fp);
 }

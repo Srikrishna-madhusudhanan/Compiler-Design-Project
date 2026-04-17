@@ -1,14 +1,31 @@
 {
   "func_name": "main",
   "nodes": [
-    {"id": 0, "name": "t3", "color": 0, "spilled": 0, "spill_offset": 0},
-    {"id": 1, "name": "t2", "color": 4, "spilled": 0, "spill_offset": 0},
-    {"id": 2, "name": "t0", "color": 1, "spilled": 0, "spill_offset": 0},
-    {"id": 3, "name": "t1", "color": 0, "spilled": 0, "spill_offset": 0}
+    {"id": 0, "name": "z$5", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 1, "name": "t0", "color": 0, "spilled": 0, "spill_offset": 0},
+    {"id": 2, "name": "x$3", "color": 1, "spilled": 0, "spill_offset": 0},
+    {"id": 3, "name": "y$4", "color": 0, "spilled": 0, "spill_offset": 0}
   ],
   "edges": [
-    {"from": 1, "to": 2},
     {"from": 2, "to": 3}
   ],
-  "stack": [0, 1, 2, 3]
+  "stack": [0, 1, 2, 3],
+  "reg_names": ["t3", "t4", "t5", "t6", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"],
+  "simplify_history": [
+    {"node_idx": 0, "degree": 0, "potential_spill": 0},
+    {"node_idx": 1, "degree": 0, "potential_spill": 0},
+    {"node_idx": 2, "degree": 1, "potential_spill": 0},
+    {"node_idx": 3, "degree": 0, "potential_spill": 0},
+    {"node_idx": 0, "degree": 0, "potential_spill": 0},
+    {"node_idx": 1, "degree": 0, "potential_spill": 0},
+    {"node_idx": 2, "degree": 1, "potential_spill": 0},
+    {"node_idx": 3, "degree": 0, "potential_spill": 0}
+  ],
+  "liveness_history": [
+    {"idx": 4, "instr": "  return z$5", "live": []},
+    {"idx": 3, "instr": "  z$5 := t0", "live": ["z$5"]},
+    {"idx": 2, "instr": "  t0 := x$3 + y$4", "live": ["t0"]},
+    {"idx": 1, "instr": "  y$4 := 20", "live": ["x$3", "y$4"]},
+    {"idx": 0, "instr": "  x$3 := 10", "live": ["x$3"]}
+  ]
 }

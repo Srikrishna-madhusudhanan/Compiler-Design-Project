@@ -4,15 +4,11 @@
     {
       "id": 0,
       "instrs": [
-        "  * = vtable_Base",
-        "  * = vtable_Derived",
-        "  t0 = &-1",
-        "  b := t0",
-        "  t1 = *b",
-        "  t2 = t1[25500]",
-        "  param b",
-        "  t3 := call *t2, 1",
-        "  return t3"
+        "  x$3 := 10",
+        "  y$4 := 20",
+        "  t0 := x$3 + y$4",
+        "  z$5 := t0",
+        "  return z$5"
       ],
       "successors": []
     }

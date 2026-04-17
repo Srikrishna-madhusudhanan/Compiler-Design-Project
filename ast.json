@@ -1,110 +1,4 @@
 {
-  "type": "STRUCT_DEF",
-  "value": "Base",
-  "children": [
-{
-  "type": "ACCESS_SPEC",
-  "children": [
-
-  ],
-  "next": {
-  "type": "FUNC_DEF",
-  "value": "Base_show",
-  "children": [
-{
-  "type": "TYPE",
-  "children": [
-
-  ]
-},
-{
-  "type": "BLOCK",
-  "children": [
-{
-  "type": "RETURN",
-  "children": [
-{
-  "type": "INT",
-  "value": 1,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ]
-},
-{
-  "type": "PARAM",
-  "value": "this",
-  "children": [
-{
-  "type": "TYPE",
-  "value": "Base",
-  "children": [
-
-  ]
-}
-  ]
-}
-  ]
-}
-}
-  ],
-  "next": {
-  "type": "STRUCT_DEF",
-  "value": "Derived",
-  "children": [
-{
-  "type": "ACCESS_SPEC",
-  "children": [
-
-  ],
-  "next": {
-  "type": "FUNC_DEF",
-  "value": "Derived_show",
-  "children": [
-{
-  "type": "TYPE",
-  "children": [
-
-  ]
-},
-{
-  "type": "BLOCK",
-  "children": [
-{
-  "type": "RETURN",
-  "children": [
-{
-  "type": "INT",
-  "value": 2,
-  "children": [
-
-  ]
-}
-  ]
-}
-  ]
-},
-{
-  "type": "PARAM",
-  "value": "this",
-  "children": [
-{
-  "type": "TYPE",
-  "value": "Derived",
-  "children": [
-
-  ]
-}
-  ]
-}
-  ]
-}
-}
-  ],
-  "next": {
   "type": "FUNC_DEF",
   "value": "main",
   "children": [
@@ -119,11 +13,17 @@
   "children": [
 {
   "type": "VAR_DECL",
-  "value": "b",
+  "value": "x",
   "children": [
 {
   "type": "TYPE",
-  "value": "Base",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 10,
   "children": [
 
   ]
@@ -131,33 +31,46 @@
   ],
   "next": {
   "type": "VAR_DECL",
-  "value": "d",
+  "value": "y",
   "children": [
 {
   "type": "TYPE",
-  "value": "Derived",
+  "children": [
+
+  ]
+},
+{
+  "type": "INT",
+  "value": 20,
   "children": [
 
   ]
 }
   ],
   "next": {
-  "type": "ASSIGN",
+  "type": "VAR_DECL",
+  "value": "z",
   "children": [
 {
-  "type": "VAR",
-  "value": "b",
+  "type": "TYPE",
   "children": [
 
   ]
 },
 {
-  "type": "UN_OP",
-  "value": "&",
+  "type": "BIN_OP",
+  "value": "+",
   "children": [
 {
   "type": "VAR",
-  "value": "d",
+  "value": "x",
+  "children": [
+
+  ]
+},
+{
+  "type": "VAR",
+  "value": "y",
   "children": [
 
   ]
@@ -169,38 +82,18 @@
   "type": "RETURN",
   "children": [
 {
-  "type": "FUNC_CALL",
-  "children": [
-{
-  "type": "MEMBER_ACCESS",
-  "value": "show",
-  "children": [
-{
   "type": "VAR",
-  "value": "b",
-  "children": [
-
-  ]
-}
-  ]
-},
-{
-  "type": "VAR",
-  "value": "b",
+  "value": "z",
   "children": [
 
   ]
 }
   ]
 }
-  ]
-}
 }
 }
 }
   ]
 }
   ]
-}
-}
 }

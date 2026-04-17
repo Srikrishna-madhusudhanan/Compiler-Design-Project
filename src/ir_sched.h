@@ -10,5 +10,6 @@
  * It builds a dependency DAG and performs list scheduling.
  */
 void ir_schedule_function(IRFunc *f);
+void ir_schedule_export_json(IRFunc *f, const char *path);
 
 #endif /* IR_SCHED_H */
