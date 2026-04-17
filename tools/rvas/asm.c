@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 enum { SEC_UNDEF = 0, SEC_TEXT = 1, SEC_RODATA = 2, SEC_DATA = 3 };
 
@@ -258,12 +259,13 @@ static bool emit_real(RvAsmResult *a, RvSectionKind sec, const char *m, RvOperan
         return emit_insn(a, sec,
                          rvas_pack_i(o[1].imm, o[1].reg, 0, o[0].reg, JALR), err);
     }
-    snprintf(err, 256, "unknown or bad operands for %s", m);
+    snprintf(err, 256, "unknown or bad operands for instruction %s", m);
     return false;
 bad:
-    snprintf(err, 256, "bad operands for %s", m);
+    snprintf(err, 256, "bad operands for instruction %s", m);
     return false;
 }
+
 
 static bool emit_branch(RvAsmResult *a, RvSectionKind sec, uint32_t funct3, RvOperand *rs1,
                         RvOperand *rs2, const char *label, char *err) {
@@ -368,8 +370,9 @@ static bool emit_stmt(RvAsmResult *a, RvSectionKind sec, RvStmt *st, char *err) 
         RvOperand ad[3] = {o[0], o[0], {RV_OP_IMM, .imm = 0}};
         if (!emit_real(a, sec, "addi", ad, 3, err))
             return false;
-        if (!add_fixup(a, RV_FIX_LO12, sec, off_addi, ilab))
+        if (!add_fixup(a, RV_FIX_LO12, sec, off_addi, o[1].sym))
             return false;
+
         return true;
     }
 
@@ -478,21 +481,48 @@ bool rvas_assemble(RvStmt **stmts, size_t n, RvAsmResult *out) {
                     rvas_asm_result_free(out);
                     return false;
                 }
-            } else if (strcmp(st->dir, ".dword") == 0 && st->dir_argc >= 1) {
-                RvBuf *b = cur_buf(out, cur);
-                uint64_t z = 0;
-                size_t off = b->len;
-                if (!buf_append(b, &z, 8)) {
-                    out->error = strdup("oom");
-                    rvas_asm_result_free(out);
-                    return false;
+            } else if (strcmp(st->dir, ".dword") == 0) {
+                for (size_t i = 0; i < st->dir_argc; i++) {
+                    RvBuf *b = cur_buf(out, cur);
+                    uint64_t z = 0;
+                    size_t off = b->len;
+                    const char *arg = st->dir_args[i];
+                    bool symbol = !(isdigit((unsigned char)arg[0]) || arg[0] == '-');
+                    if (!symbol) z = (uint64_t)strtoull(arg, NULL, 0);
+                    if (!buf_append(b, &z, 8)) {
+                        out->error = strdup("oom");
+                        rvas_asm_result_free(out);
+                        return false;
+                    }
+                    if (symbol) {
+                        if (!add_fixup(out, RV_FIX_ABS64, sec_kind_to_num(cur), off, arg)) {
+                            out->error = strdup("oom");
+                            return false;
+                        }
+                    }
                 }
-                if (!add_fixup(out, RV_FIX_ABS64, sec_kind_to_num(cur), off, st->dir_args[0])) {
-                    out->error = strdup("oom");
-                    rvas_asm_result_free(out);
-                    return false;
+            } else if (strcmp(st->dir, ".word") == 0) {
+                for (size_t i = 0; i < st->dir_argc; i++) {
+                    RvBuf *b = cur_buf(out, cur);
+                    uint32_t w = 0;
+                    size_t off = b->len;
+                    const char *arg = st->dir_args[i];
+                    bool symbol = !(isdigit((unsigned char)arg[0]) || arg[0] == '-');
+                    if (!symbol) w = (uint32_t)strtoul(arg, NULL, 0);
+                    if (!buf_u32le(b, w)) {
+                        out->error = strdup("oom");
+                        return false;
+                    }
+                    if (symbol) {
+                        if (!add_fixup(out, RV_FIX_ABS32, sec_kind_to_num(cur), off, arg)) {
+                            out->error = strdup("oom");
+                            return false;
+                        }
+                    }
                 }
             }
+
+
             continue;
         }
         if (st->kind == RV_STMT_INSN) {

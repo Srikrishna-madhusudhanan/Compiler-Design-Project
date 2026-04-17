@@ -1,0 +1,82 @@
+{
+  "func_name": "foo",
+  "blocks": [
+    {
+      "id": 0,
+      "instrs": [
+        "L0:",
+        "  if x$3 >= y$4 goto L2"
+      ],
+      "successors": [2, 1]
+    },
+    {
+      "id": 1,
+      "instrs": [
+        "L1:",
+        "  t0 := x$3 + 1",
+        "  x$3 := t0",
+        "  goto L0"
+      ],
+      "successors": [0]
+    },
+    {
+      "id": 2,
+      "instrs": [
+        "L2:",
+        "  i$5 := 0"
+      ],
+      "successors": [3]
+    },
+    {
+      "id": 3,
+      "instrs": [
+        "L3:",
+        "  if i$5 >= 5 goto L6"
+      ],
+      "successors": [8, 4]
+    },
+    {
+      "id": 4,
+      "instrs": [
+        "L4:",
+        "  t1 := i$5 * 2",
+        "  j$6 := t1",
+        "  if j$6 <= 5 goto L9"
+      ],
+      "successors": [6, 5]
+    },
+    {
+      "id": 5,
+      "instrs": [
+        "L7:",
+        "  goto L6"
+      ],
+      "successors": [8]
+    },
+    {
+      "id": 6,
+      "instrs": [
+        "L9:"
+      ],
+      "successors": [7]
+    },
+    {
+      "id": 7,
+      "instrs": [
+        "L5:",
+        "  t2 := i$5 + 1",
+        "  i$5 := t2",
+        "  goto L3"
+      ],
+      "successors": [3]
+    },
+    {
+      "id": 8,
+      "instrs": [
+        "L6:",
+        "  return z$7"
+      ],
+      "successors": []
+    }
+  ]
+}

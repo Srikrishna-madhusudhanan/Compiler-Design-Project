@@ -73,10 +73,10 @@ static RvOperand *parse_operand(RvToken **cur, RvToken *end, bool *ok) {
         RvOperand *o = calloc(1, sizeof(*o));
         o->kind = RV_OP_IMM;
         o->imm = (int32_t)base;
-        (*cur)++;
         *ok = true;
         return o;
     }
+
 
     if ((*cur)->kind == TOK_MINUS) {
         (*cur)++;
@@ -201,11 +201,14 @@ static RvStmt *parse_instruction(RvToken *toks, size_t nt, int line_no, RvParseR
         bool ok = false;
         RvOperand *o = parse_operand(&p, endp, &ok);
         if (!ok || !o) {
-            set_err(r, "bad operand");
+            char buf[256];
+            snprintf(buf, sizeof buf, "bad operand for %s at line %d", st->mnemonic, line_no);
+            set_err(r, buf);
             rvas_stmt_free(st);
             free(st);
             return NULL;
         }
+
         if (o->kind == RV_OP_MEM) {
             int ri = rvas_reg_by_name(o->sym);
             if (ri < 0) {
