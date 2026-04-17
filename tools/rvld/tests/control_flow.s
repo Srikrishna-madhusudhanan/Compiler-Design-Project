@@ -2,13 +2,13 @@
   .globl main
 
 main:
-  # --- Prologue (Frame Size: 96) ---
-  addi sp, sp, -96
-  sd ra, 88(sp)
-  sd s0, 80(sp)
-  addi s0, sp, 96
+  # --- Prologue (Frame Size: 128) ---
+  addi sp, sp, -128
+  sd ra, 120(sp)
+  sd s0, 112(sp)
+  addi s0, sp, 128
 
-  # Line 3: i$3 = ...
+  # Line 3: i = ...
   li t0, 0
   mv t5, t0
   # Line 9: label
@@ -24,7 +24,7 @@ L1:
   li t1, 1
   add t2, t0, t1
   mv t3, t2
-  # Line 6: i$3 = ...
+  # Line 6: i = ...
   mv t0, t3
   mv t5, t0
   # Line 7: if (...) goto L5
@@ -42,14 +42,14 @@ L5:
   li t1, 10
   add t2, t0, t1
   mv t3, t2
-  # Line 8: i$3 = ...
+  # Line 8: i = ...
   mv t0, t3
   mv t5, t0
   # Line 9: goto L0
   j L0
   # Line 9: label
 L2:
-  # Line 12: j$4 = ...
+  # Line 12: j = ...
   li t0, 0
   mv t4, t0
   # Line 15: label
@@ -71,7 +71,7 @@ L15:
   mv t1, t4
   add t2, t0, t1
   mv t3, t2
-  # Line 14: i$3 = ...
+  # Line 14: i = ...
   mv t0, t3
   mv t5, t0
   # Line 15: label
@@ -81,7 +81,7 @@ L16:
   li t1, 1
   add t2, t0, t1
   mv t3, t2
-  # Line 12: j$4 = ...
+  # Line 12: j = ...
   mv t0, t3
   mv t4, t0
   # Line 15: label
@@ -101,7 +101,7 @@ L19:
   mv t1, t4
   add t2, t0, t1
   mv t3, t2
-  # Line 14: i$3 = ...
+  # Line 14: i = ...
   mv t0, t3
   mv t5, t0
   # Line 15: label
@@ -111,7 +111,7 @@ L20:
   li t1, 1
   add t2, t0, t1
   mv t3, t2
-  # Line 12: j$4 = ...
+  # Line 12: j = ...
   mv t0, t3
   mv t4, t0
   # Line 15: label
@@ -131,7 +131,7 @@ L23:
   mv t1, t4
   add t2, t0, t1
   mv t3, t2
-  # Line 14: i$3 = ...
+  # Line 14: i = ...
   mv t0, t3
   mv t5, t0
   # Line 15: label
@@ -141,7 +141,7 @@ L24:
   li t1, 1
   add t2, t0, t1
   mv t3, t2
-  # Line 12: j$4 = ...
+  # Line 12: j = ...
   mv t0, t3
   mv t4, t0
   # Line 15: label
@@ -161,7 +161,7 @@ L27:
   mv t1, t4
   add t2, t0, t1
   mv t3, t2
-  # Line 14: i$3 = ...
+  # Line 14: i = ...
   mv t0, t3
   mv t5, t0
   # Line 15: label
@@ -171,7 +171,7 @@ L28:
   li t1, 1
   add t2, t0, t1
   mv t3, t2
-  # Line 12: j$4 = ...
+  # Line 12: j = ...
   mv t0, t3
   mv t4, t0
   # Line 15: label
@@ -191,7 +191,7 @@ L31:
   mv t1, t4
   add t2, t0, t1
   mv t3, t2
-  # Line 14: i$3 = ...
+  # Line 14: i = ...
   mv t0, t3
   mv t5, t0
   # Line 15: label
@@ -201,7 +201,7 @@ L32:
   li t1, 1
   add t2, t0, t1
   mv t3, t2
-  # Line 12: j$4 = ...
+  # Line 12: j = ...
   mv t0, t3
   mv t4, t0
   # Line 15: label
@@ -213,16 +213,13 @@ L9:
   mv t3, t2
   # Line 17: return
   mv a0, t3
-  addi sp, s0, -96
-  ld ra, 88(sp)
-  ld s0, 80(sp)
-  addi sp, sp, 96
-  jr ra
+  j .L_exit_main
 
-  # --- Default Epilogue ---
-  addi sp, s0, -96
-  ld ra, 88(sp)
-  ld s0, 80(sp)
-  addi sp, sp, 96
+.L_exit_main:
+  # --- Epilogue ---
+  addi sp, s0, -128
+  ld ra, 120(sp)
+  ld s0, 112(sp)
+  addi sp, sp, 128
   jr ra
 
