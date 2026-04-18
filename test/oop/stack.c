@@ -1,5 +1,5 @@
 
-int MAX = 100;
+const int MAX = 100;
 
 class Stack {
 private:

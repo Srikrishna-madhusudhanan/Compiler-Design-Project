@@ -1528,6 +1528,11 @@ static void append_instr_list(IRInstr **head, IRInstr **tail, IRInstr *list_head
     }
 }
 
+typedef struct {
+    char *orig;
+    char *fresh;
+} InternalLabelRename;
+
 static IRInstr* clone_loop_iteration(BasicBlock **body_blocks,
                                      int body_count,
                                      char **orig_labels,
@@ -1540,11 +1545,51 @@ static IRInstr* clone_loop_iteration(BasicBlock **body_blocks,
     IRInstr *head = NULL;
     IRInstr *tail = NULL;
 
+    // Step 1: Scan for internal labels definitions that are not leading block labels
+    InternalLabelRename internal_renames[512];
+    int internal_rename_count = 0;
+
+    for (int i = 0; i < body_count; i++) {
+        IRInstr *cur = body_blocks[i]->instrs;
+        while (cur) {
+            if (cur->kind == IR_LABEL && cur->label) {
+                // Check if it's already in orig_labels
+                int is_orig = 0;
+                for (int j = 0; j < body_count; j++) {
+                    if (orig_labels[j] && strcmp(orig_labels[j], cur->label) == 0) {
+                        is_orig = 1;
+                        break;
+                    }
+                }
+                // Also skip if it is the header label (already handled by header_target)
+                if (!is_orig && strcmp(cur->label, header_label) != 0) {
+                    // It's an internal label. Check if already seen.
+                    int seen = 0;
+                    for (int j = 0; j < internal_rename_count; j++) {
+                        if (strcmp(internal_renames[j].orig, cur->label) == 0) {
+                            seen = 1;
+                            break;
+                        }
+                    }
+                    if (!seen && internal_rename_count < 512) {
+                        internal_renames[internal_rename_count].orig = cur->label;
+                        internal_renames[internal_rename_count].fresh = ir_new_label();
+                        internal_rename_count++;
+                    }
+                }
+            }
+            if (cur == body_blocks[i]->last) break;
+            cur = cur->next;
+        }
+    }
+
+    // Step 2: Clone and apply renames
     for (int i = 0; i < body_count; i++) {
         BasicBlock *bb = body_blocks[i];
         IRInstr *cur = bb->instrs;
         if (!cur) continue;
 
+        // Handle leading label of the block
         if (cur->kind == IR_LABEL) {
             IRInstr *lbl = clone_instr(cur);
             if (!lbl) continue;
@@ -1567,6 +1612,15 @@ static IRInstr* clone_loop_iteration(BasicBlock **body_blocks,
                 if (idx >= 0) {
                     if (dup->label) free(dup->label);
                     dup->label = strdup(curr_labels[idx]);
+                } else {
+                    // Check internal renames
+                    for (int j = 0; j < internal_rename_count; j++) {
+                        if (strcmp(internal_renames[j].orig, cur->label) == 0) {
+                            if (dup->label) free(dup->label);
+                            dup->label = strdup(internal_renames[j].fresh);
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -1579,6 +1633,15 @@ static IRInstr* clone_loop_iteration(BasicBlock **body_blocks,
                     if (idx >= 0) {
                         free(dup->label);
                         dup->label = strdup(curr_labels[idx]);
+                    } else {
+                        // Check internal renames
+                        for (int j = 0; j < internal_rename_count; j++) {
+                            if (strcmp(internal_renames[j].orig, dup->label) == 0) {
+                                free(dup->label);
+                                dup->label = strdup(internal_renames[j].fresh);
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -1587,6 +1650,11 @@ static IRInstr* clone_loop_iteration(BasicBlock **body_blocks,
             if (cur == bb->last) break;
             cur = cur->next;
         }
+    }
+
+    // Cleanup internal renames fresh strings
+    for (int i = 0; i < internal_rename_count; i++) {
+        free(internal_renames[i].fresh);
     }
 
     if (tail_out) *tail_out = tail;
