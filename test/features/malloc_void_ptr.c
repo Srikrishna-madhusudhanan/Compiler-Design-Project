@@ -11,6 +11,7 @@ int main() {
     /* Test 3: Verify value */
     if (*ip == 123) {
         free(vp);  /* Free using original void* */
+        printf("Success\n");
         return 0;  /* Success */
     }
     

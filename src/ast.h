@@ -37,7 +37,9 @@ typedef enum {
     NODE_PRE_INC,
     NODE_PRE_DEC,
     NODE_POST_INC,
-    NODE_POST_DEC
+    NODE_POST_DEC,
+    NODE_NEW,
+    NODE_DELETE
 } NodeType;
 
 typedef struct ASTNode {

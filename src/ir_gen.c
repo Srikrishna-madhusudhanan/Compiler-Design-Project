@@ -524,9 +524,8 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
 
                 ir_free_operand(&base_op);
                 ir_free_operand(&index_op);
-                if (val.name) free(val.name);
                 /* Result of assignment expression is the stored value */
-                return ir_op_const(0);
+                return val;
             } else if (node->left->type == NODE_MEMBER_ACCESS) {
                 /* Struct member store */
                 ASTNode *mem = node->left;
@@ -537,16 +536,14 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
                 IROperand index_op = ir_op_const(idx);
                 ir_append(list, ir_make_store(base, index_op, scale, val, line));
                 if (base.name) free(base.name);
-                if (val.name) free(val.name);
-                return ir_op_const(0);
+                return val;
             } else if (node->left->type == NODE_UN_OP && node->left->int_val == '*') {
                 /* Pointer dereference assignment: *p = val */
                 IROperand base = gen_expr(node->left->left, list);
                 int scale = get_type_size(node->left->data_type, node->left->pointer_level, node->left->struct_def);
                 ir_append(list, ir_make_store(base, ir_op_const(0), scale, val, line));
                 if (base.name) free(base.name);
-                if (val.name) free(val.name);
-                return ir_op_const(0);
+                return val;
             } else {
                 /* Fallback: treat as simple assignment to unknown target */
                 if (val.name) free(val.name);
@@ -599,7 +596,6 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
 
             for (int i = 0; i < nargs; i++) {
                 ir_append(list, ir_make_param(ops[i], line));
-                if (ops[i].name) free(ops[i].name);
             }
 
             /* Call */
@@ -695,6 +691,32 @@ static IROperand gen_expr(ASTNode *node, IRInstr **list) {
                 free(t_new);
                 return new_val;
             }
+        }
+
+        case NODE_NEW: {
+            int size = get_type_size(node->data_type, 0, node->struct_def);
+            if (size <= 0) size = 8;
+            
+            ir_append(list, ir_make_param(ir_op_const(size), line));
+            char *t_obj = ir_new_temp();
+            ir_append(list, ir_make_call(t_obj, "malloc", 1, line));
+            IROperand obj_op = ir_op_name(t_obj);
+            
+            if (node->func_sym) {
+                ir_append(list, ir_make_param(obj_op, line));
+                ASTNode *arg = node->params;
+                int nargs = 1;
+                while (arg) {
+                    IROperand arg_op = gen_expr(arg, list);
+                    ir_append(list, ir_make_param(arg_op, line));
+                    if (arg_op.name) free(arg_op.name);
+                    nargs++;
+                    arg = arg->next;
+                }
+                ir_append(list, ir_make_call_void(node->func_sym->name, nargs, line));
+            }
+            free(t_obj);
+            return obj_op;
         }
 
         default:
@@ -895,6 +917,11 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
         }
 
         case NODE_ASSIGN:
+        case NODE_FUNC_CALL:
+        case NODE_PRE_INC:
+        case NODE_POST_INC:
+        case NODE_PRE_DEC:
+        case NODE_POST_DEC:
             (void)gen_expr(node, list);
             break;
 
@@ -929,7 +956,7 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
                 if (vtable_op.name) free(vtable_op.name);
                 if (base.name) free(base.name);
             }
-            if (sym && sym->struct_def) {
+            if (sym && sym->struct_def && sym->pointer_level == 0) {
                 char dtor_name[256];
                 snprintf(dtor_name, sizeof(dtor_name), "%s__dtor", sym->struct_def->name);
                 Symbol *dtor = lookup(dtor_name);
@@ -953,7 +980,6 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
             if (node->right) {
                 IROperand init = gen_expr(node->right, list);
                 ir_append(list, ir_make_assign(node->sym ? node->sym->ir_name : node->str_val, init, line));
-                if (init.name) free(init.name);
             }
             break;
         }
@@ -972,7 +998,6 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
 
             for (int i = 0; i < nargs; i++) {
                 ir_append(list, ir_make_param(ops[i], line));
-                if (ops[i].name) free(ops[i].name);
             }
             ir_append(list, ir_make_call_void("printf", nargs, line));
             break;
@@ -992,16 +1017,31 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
 
             for (int i = 0; i < nargs; i++) {
                 ir_append(list, ir_make_param(ops[i], line));
-                if (ops[i].name) free(ops[i].name);
             }
             ir_append(list, ir_make_call_void("scanf", nargs, line));
             break;
         }
 
-        default:
-            /* Expression statement (e.g. foo(); x+1;) */
-            (void)gen_expr(node, list);
+        case NODE_DELETE: {
+            IROperand ptr = gen_expr(node->left, list);
+            char *L_skip = ir_new_label();
+            ir_append(list, ir_make_if(ptr, ir_op_const(0), IR_EQ, L_skip, line));
+            
+            if (node->func_sym) {
+                ir_append(list, ir_make_param(ptr, line));
+                ir_append(list, ir_make_call_void(node->func_sym->name, 1, line));
+            }
+            
+            ir_append(list, ir_make_param(ptr, line));
+            ir_append(list, ir_make_call_void("free", 1, line));
+            
+            ir_append(list, ir_make_label(L_skip, line));
+            if (ptr.name) free(ptr.name);
+            free(L_skip);
             break;
+        }
+
+        default:
     }
 }
 

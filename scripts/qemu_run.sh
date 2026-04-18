@@ -26,7 +26,7 @@ fi
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 [options] <source.c> [input-string]" >&2
-    echo "Options: -O1, -O2, --metrics" >&2
+    echo "Options: -O1, -O2, --metrics, --cleanup" >&2
     exit 1
 fi
 
@@ -43,10 +43,13 @@ fi
 #         $RISCVC, causing "unrecognised option" errors.
 COMPILER_FLAGS=()
 SHOW_METRICS=false
+CLEANUP=false
 
 while [[ $# -gt 0 && "$1" == -* ]]; do
     if [[ "$1" == "--metrics" ]]; then
         SHOW_METRICS=true
+    elif [[ "$1" == "--cleanup" ]]; then
+        CLEANUP=true
     else
         COMPILER_FLAGS+=("$1")
     fi
@@ -148,4 +151,9 @@ EOF
     else
         echo "--> Warning: Metrics output file is empty."
     fi
+fi
+
+if [ "$CLEANUP" = true ]; then
+    echo "--> Cleaning up generated files..."
+    rm -f *.json *.dot
 fi

@@ -57,13 +57,10 @@ static int get_offset(const char *name) {
     Symbol *sym = lookup_in_scope(current_codegen_scope, name);
     if (!sym) sym = lookup_all_scopes(name);
     if (sym && sym->kind != SYM_FUNCTION && sym->kind != SYM_STRUCT) {
-        if (sym->kind == SYM_PARAMETER) {
-            return sym->frame_offset;
-        }
         /* Find saved_regs_size to correctly offset locals from the frame pointer */
         int callee_saves_count = 0;
         if (cur_ra) {
-            for (int i = 0; i < RA_NUM_REGS; i++) {
+            for (int i = RA_FIRST_CALLEE_SAVED; i < RA_NUM_REGS; i++) {
                 if (cur_ra->callee_used[i]) callee_saves_count++;
             }
         }
@@ -325,9 +322,23 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
             Symbol *struct_sym = vtables[i];
             fprintf(out, "vtable_%s:\n", struct_sym->name);
             Symbol *m = struct_sym->virtual_methods;
-            while (m) {
-                fprintf(out, "  .dword %s\n", m->name);
-                m = m->next_member;
+            int size = struct_sym->vtable_size;
+            if (size > 0) {
+                Symbol **ordered_vt = calloc(size, sizeof(Symbol*));
+                while (m) {
+                    if (m->vtable_index >= 0 && m->vtable_index < size) {
+                        ordered_vt[m->vtable_index] = m;
+                    }
+                    m = m->next_virtual;
+                }
+                for (int j = 0; j < size; j++) {
+                    if (ordered_vt[j]) {
+                        fprintf(out, "  .dword %s\n", ordered_vt[j]->name);
+                    } else {
+                        fprintf(out, "  .dword 0\n");
+                    }
+                }
+                free(ordered_vt);
             }
         }
         fprintf(out, "  .text\n\n");

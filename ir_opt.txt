@@ -1,810 +1,177 @@
 function main:
-  total$3 := 0
-  i$4 := 0
-L0:
-L3:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L4:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L5:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L6:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L7:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L8:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L9:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L10:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L11:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L12:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L13:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L14:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L15:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L16:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L17:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L18:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
+  t0 := &tree$35
+  param t0
+  call BST__ctor, 1
+  t1 := &choice$36
+  t2 := &val$37
+  t3 := &tree$35
+  t4 := &tree$35
+  t5 := &val$37
+  t6 := &tree$35
 L19:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L20:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L21:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
+  param .LC5
+  call printf, 1
+  param .LC6
+  call printf, 1
+  param .LC7
+  param t1
+  call scanf, 2
+  if choice$36 == 1 goto L22
+  if choice$36 == 2 goto L23
+  if choice$36 == 3 goto L24
+  if choice$36 == 4 goto L25
+  goto L26
 L22:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
+  param .LC8
+  call printf, 1
+  param .LC9
+  param t2
+  call scanf, 2
+  param t3
+  param val$37
+  call BST_insert_int, 2
+  goto L19
 L23:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
+  param t4
+  call BST_display, 1
+  goto L19
 L24:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
+  param .LC10
+  call printf, 1
+  param .LC11
+  param t5
+  call scanf, 2
+  param t6
+  param val$37
+  call BST_find_int, 2
+  goto L19
 L25:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L26:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L27:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L28:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L29:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L30:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L31:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L32:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L33:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L34:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L35:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L36:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L37:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L38:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L39:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L40:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L41:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L42:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L43:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L44:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L45:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L46:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L47:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L48:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L49:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L50:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L51:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L52:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L53:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L54:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L55:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L56:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L57:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L58:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L59:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L60:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L61:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L62:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L63:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L64:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L65:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L66:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L67:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L68:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L69:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L70:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L71:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L72:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L73:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L74:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L75:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L76:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L77:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L78:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L79:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L80:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L81:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L82:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L83:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L84:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L85:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L86:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L87:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L88:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L89:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L90:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L91:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L92:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L93:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L94:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L95:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L96:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L97:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L98:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L99:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L100:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L101:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L102:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L103:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L104:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L105:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L106:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L107:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L108:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L109:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L110:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L111:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L112:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L113:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L114:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L115:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L116:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L117:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L118:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L119:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L120:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L121:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L122:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L123:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L124:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L125:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L126:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L127:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L128:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L129:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L130:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L131:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L132:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L133:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L134:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L135:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L136:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L137:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L138:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L139:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L140:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L141:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L142:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L143:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L144:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L145:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L146:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L147:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L148:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L149:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L150:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L151:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L152:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L153:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L154:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L155:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L156:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L157:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L158:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L159:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L160:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L161:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L162:
-  t0 := total$3 + 1
-  total$3 := t0
-  t1 := i$4 + 1
-  i$4 := t1
-L2:
-  param .LC0
-  param total$3
-  call printf, 2
   return 0
+L26:
+  param .LC12
+  call printf, 1
+  goto L19
+
+function BST_find_int:
+  t0 := load this$31[0] (scale 8)
+  param this$31
+  param t0
+  param key$32
+  t1 := call BST_search_struct_int, 3
+  if t1 == 0 goto L17
+L16:
+  param .LC3
+  param key$32
+  call printf, 2
+  goto L18
+L17:
+  param .LC4
+  param key$32
+  call printf, 2
+L18:
+  return
+
+function BST_display:
+  param .LC1
+  call printf, 1
+  t0 := load this$29[0] (scale 8)
+  param this$29
+  param t0
+  call BST_inorder_struct, 2
+  param .LC2
+  call printf, 1
+  return
+
+function BST_insert_int:
+  t0 := load this$26[0] (scale 8)
+  param this$26
+  param t0
+  param val$27
+  t1 := call BST_insert_struct_int, 3
+  store this$26[0] (scale 8) := t1
+  return
+
+function BST__ctor:
+  store this$24[0] (scale 8) := 0
+  return
+
+function BST_search_struct_int:
+  if node$21 == 0 goto L9
+L12:
+  t0 := load node$21[0] (scale 4)
+  if t0 != key$22 goto L11
+L9:
+  return node$21
+L11:
+  t1 := load node$21[0] (scale 4)
+  if key$22 >= t1 goto L14
+L13:
+  t2 := load node$21[1] (scale 8)
+  param this$20
+  param t2
+  param key$22
+  t3 := call BST_search_struct_int, 3
+  return t3
+L14:
+  t4 := load node$21[2] (scale 8)
+  param this$20
+  param t4
+  param key$22
+  t5 := call BST_search_struct_int, 3
+  return t5
+
+function BST_inorder_struct:
+  if node$18 != 0 goto L8
+L6:
+  return
+L8:
+  t0 := load node$18[1] (scale 8)
+  param this$17
+  param t0
+  call BST_inorder_struct, 2
+  t1 := load node$18[0] (scale 4)
+  param .LC0
+  param t1
+  call printf, 2
+  t2 := load node$18[2] (scale 8)
+  param this$17
+  param t2
+  call BST_inorder_struct, 2
+  return
+
+function BST_insert_struct_int:
+  if node$14 != 0 goto L2
+L0:
+  param 24
+  t0 := call malloc, 1
+  param t0
+  param val$15
+  call Node__ctor, 2
+  return t0
+L2:
+  t1 := load node$14[0] (scale 4)
+  if val$15 >= t1 goto L4
+L3:
+  t2 := load node$14[1] (scale 8)
+  param this$13
+  param t2
+  param val$15
+  t3 := call BST_insert_struct_int, 3
+  store node$14[1] (scale 8) := t3
+  goto L5
+L4:
+  t4 := load node$14[2] (scale 8)
+  param this$13
+  param t4
+  param val$15
+  t5 := call BST_insert_struct_int, 3
+  store node$14[2] (scale 8) := t5
+L5:
+  return node$14
+
+function Node__ctor:
+  store this$8[0] (scale 4) := val$9
+  store this$8[2] (scale 8) := 0
+  store this$8[1] (scale 8) := 0
+  return
 

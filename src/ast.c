@@ -40,6 +40,8 @@ const char* node_type_to_string(NodeType type) {
         case NODE_PRE_DEC: return "PRE_DEC";
         case NODE_POST_INC: return "POST_INC";
         case NODE_POST_DEC: return "POST_DEC";
+        case NODE_NEW: return "NEW";
+        case NODE_DELETE: return "DELETE";
         default: return "UNKNOWN";
     }
 }
@@ -633,6 +635,15 @@ void print_ast(ASTNode *node, int level) {
             break;
         case NODE_POST_DEC:
             printf("PostDec\n");
+            print_ast(node->left, level + 1);
+            break;
+        case NODE_NEW:
+            printf("New: %s\n", node->str_val);
+            print_indent(level + 1); printf("Params:\n");
+            print_ast(node->params, level + 2);
+            break;
+        case NODE_DELETE:
+            printf("Delete\n");
             print_ast(node->left, level + 1);
             break;
         default:

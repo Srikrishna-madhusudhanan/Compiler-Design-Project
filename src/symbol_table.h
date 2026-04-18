@@ -1,6 +1,7 @@
 #ifndef SYMBOL_TABLE_H
 #define SYMBOL_TABLE_H
 
+typedef struct Symbol Symbol;  /* Forward declaration */
 
 #define TABLE_SIZE 200 // size of the scope table
 
@@ -78,6 +79,8 @@ typedef struct Symbol {
     // For functions
     int param_count;
     DataType *param_types;
+    int *param_pointer_levels;
+    Symbol **param_struct_defs;  // struct def for each param
     /* For functions: per-parameter array flag
      *   param_is_array[i] == 1 if the i-th parameter is an array
      *   (e.g., declared as T a[]).
@@ -100,6 +103,7 @@ typedef struct Symbol {
 
     struct Symbol *next;          // hash chaining
     struct Symbol *next_member;   // linked list for struct/class members
+    struct Symbol *next_virtual;  // linked list for virtual methods (to avoid breaking next_member)
     struct Scope *scope;          // pointer to owning scope for function symbols
     char ir_name[128];            // Unique name for IR generation
 } Symbol;

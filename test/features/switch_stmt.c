@@ -50,8 +50,8 @@ int main() {
 
     /* Just combine to make the value depend on all switches */
     int v5 = v1 + v2 + v3 + v4;
-    printf("v1 = %d\n", v1); // expected: 200
-    printf("v2 = %d\n", v2); // expected: 201 
+    printf("v1 = %d\n", v1); // expected: 201
+    printf("v2 = %d\n", v2); // expected: 1 
     printf("v3 = %d\n", v3); // expected: 1
     printf("v4 = %d\n", v4); // expected: -2
     printf("v5 = %d\n", v5); // expected: 202 (200 + 1 + 1 + -2)

@@ -4,6 +4,7 @@
 #include "symbol_table.h"
 #include "ast.h"
 #include "semantic.h"
+#include "y.tab.h"
 
 static Symbol *current_function = NULL;
 int semantic_errors = 0;
@@ -11,7 +12,6 @@ static int break_context_depth = 0;
 static int loop_context_depth = 0;
 
 static int current_local_offset = 0;
-static int current_param_offset = 16; /* standard positive offset for arg passing */
 
 int get_type_size(DataType t, int pointer_level, Symbol *struct_def);
 
@@ -32,6 +32,17 @@ static Symbol *find_struct_member(Symbol *struct_sym, const char *name) {
             return m;
         m = m->next_member;
     }
+    fprintf(stderr, "DEBUG: find_struct_member failed for '%s' in class '%s'. Members:\n", name, struct_sym->name);
+    m = struct_sym->members;
+    while (m) {
+        fprintf(stderr, "  member name='%s' unmangled='%s' kind=%d\n", m->name, m->unmangled_name ? m->unmangled_name : "(null)", m->kind);
+        m = m->next_member;
+    }
+    m = struct_sym->virtual_methods;
+    while (m) {
+        fprintf(stderr, "  virtual name='%s' unmangled='%s' kind=%d\n", m->name, m->unmangled_name ? m->unmangled_name : "(null)", m->kind);
+        m = m->next_member;
+    }
     return NULL;
 }
 
@@ -40,7 +51,7 @@ static Symbol *find_virtual_method(Symbol *struct_sym, const char *name) {
     while (m) {
         if ((m->unmangled_name && strcmp(m->unmangled_name, name) == 0) || strcmp(m->name, name) == 0)
             return m;
-        m = m->next_member;
+        m = m->next_virtual;
     }
     return NULL;
 }
@@ -50,11 +61,11 @@ static void replace_virtual_method(Symbol *struct_sym, Symbol *new_method) {
     while (*m) {
         if (((*m)->unmangled_name && new_method->unmangled_name && strcmp((*m)->unmangled_name, new_method->unmangled_name) == 0) ||
             strcmp((*m)->name, new_method->name) == 0) {
-            new_method->next_member = (*m)->next_member;
+            new_method->next_virtual = (*m)->next_virtual;
             *m = new_method;
             return;
         }
-        m = &(*m)->next_member;
+        m = &(*m)->next_virtual;
     }
 }
 
@@ -66,6 +77,11 @@ void semantic_error(int line, const char *msg) {
 /* Check if a type represents a void pointer (void*) */
 static int is_void_pointer(DataType type, int pointer_level) {
     return type == TYPE_VOID && pointer_level > 0;
+}
+
+/* Check if a node represents the NULL constant */
+static int is_null_constant(ASTNode *node) {
+    return node->type == NODE_VAR && strcmp(node->str_val, "NULL") == 0;
 }
 
 static int is_class_subtype(Symbol *derived, Symbol *base) {
@@ -91,7 +107,11 @@ static int types_compatible(DataType t1, int p1, Symbol *s1,
 
     /* Class pointer conversions: Derived* -> Base* */
     if (t1 == TYPE_STRUCT && t2 == TYPE_STRUCT && p1 > 0 && p2 > 0 && p1 == p2 && s1 && s2) {
-        if (is_class_subtype(s2, s1)) return 1;
+        if (is_class_subtype(s1, s2)) return 1;
+    }
+
+    if (t1 == TYPE_STRUCT && t2 == TYPE_STRUCT && p1 == p2 && s1 != s2) {
+        // Log mismatch for debugging
     }
 
     /* Both are non-void pointers to same base type and same indirection count */
@@ -125,6 +145,14 @@ static void init_builtin_functions() {
     free_sym->param_names = malloc(sizeof(char*) * 1);
     free_sym->param_names[0] = strdup("ptr");
     insert_symbol(free_sym);
+
+    /* NULL: void* constant pointer */
+    Symbol *null_sym = create_symbol("NULL", TYPE_VOID, SYM_CONSTANT, 0);
+    null_sym->pointer_level = 1;
+    null_sym->is_const = 1;
+    null_sym->const_value = 0;
+    null_sym->has_const_value = 1;
+    insert_symbol(null_sym);
 }
 
 const char* type_to_string(DataType t) {
@@ -214,6 +242,24 @@ void analyze_struct_def(ASTNode *node) {
             else m->access_modifier = b_mem->access_modifier;
             m->defining_struct = b_mem->defining_struct;
             m->struct_offset = b_mem->struct_offset;
+
+            /* Full copy for functions (parameters) */
+            if (b_mem->kind == SYM_FUNCTION) {
+                m->param_count = b_mem->param_count;
+                if (m->param_count > 0) {
+                    m->param_types = malloc(sizeof(DataType) * m->param_count);
+                    memcpy(m->param_types, b_mem->param_types, sizeof(DataType) * m->param_count);
+                    m->param_pointer_levels = malloc(sizeof(int) * m->param_count);
+                    memcpy(m->param_pointer_levels, b_mem->param_pointer_levels, sizeof(int) * m->param_count);
+                    m->param_struct_defs = malloc(sizeof(Symbol*) * m->param_count);
+                    memcpy(m->param_struct_defs, b_mem->param_struct_defs, sizeof(Symbol*) * m->param_count);
+                    m->param_is_array = malloc(sizeof(int) * m->param_count);
+                    memcpy(m->param_is_array, b_mem->param_is_array, sizeof(int) * m->param_count);
+                    m->param_names = malloc(sizeof(char*) * m->param_count);
+                    for (int i = 0; i < m->param_count; i++) m->param_names[i] = strdup(b_mem->param_names[i]);
+                }
+            }
+
             m->next_member = sym->members;
             sym->members = m;
             b_mem = b_mem->next_member;
@@ -221,16 +267,15 @@ void analyze_struct_def(ASTNode *node) {
 
         Symbol *b_v = base->virtual_methods;
         while (b_v) {
-            Symbol *v = create_symbol(b_v->name, b_v->type, b_v->kind, b_v->line_number);
-            if (b_v->unmangled_name) v->unmangled_name = strdup(b_v->unmangled_name);
-            v->is_virtual = 1;
-            v->vtable_index = b_v->vtable_index;
-            if (node->inheritance_modifier == 1) v->access_modifier = 1;
-            else v->access_modifier = b_v->access_modifier;
-            v->defining_struct = b_v->defining_struct;
-            v->next_member = sym->virtual_methods;
-            sym->virtual_methods = v;
-            b_v = b_v->next_member;
+            /* Find the already copied member in 'sym' that corresponds to this virtual method */
+            Symbol *v = find_struct_member(sym, b_v->name);
+            if (v) {
+                v->is_virtual = 1;
+                v->vtable_index = b_v->vtable_index;
+                v->next_virtual = sym->virtual_methods;
+                sym->virtual_methods = v;
+            }
+            b_v = b_v->next_virtual;
         }
 
         offset = base->struct_size;
@@ -275,20 +320,20 @@ void analyze_struct_def(ASTNode *node) {
                 ASTNode *this_param = create_node(NODE_PARAM);
                 this_param->str_val = strdup("this");
                 this_param->left = this_type;
+                this_param->pointer_level = 1;
                 this_param->line_number = member->line_number;
                 
                 this_param->next = member->params;
                 member->params = this_param;
             }
 
-            analyze_function(member);
+            analyze_function(member, orig_name);
             Symbol *func = lookup(member->str_val);
 
             if (func) {
                 func->unmangled_name = orig_name; 
                 func->access_modifier = current_access;
                 func->defining_struct = sym;
-                // analyze_function already prepends to sym->members
                 Symbol *existing_v = find_virtual_method(sym, orig_name);
                 if (member->is_virtual || existing_v) {
                     func->is_virtual = 1;
@@ -296,7 +341,7 @@ void analyze_struct_def(ASTNode *node) {
                         func->vtable_index = existing_v->vtable_index;
                         replace_virtual_method(sym, func);
                     } else {
-                        func->next_member = sym->virtual_methods;
+                        func->next_virtual = sym->virtual_methods;
                         sym->virtual_methods = func;
                     }
                 }
@@ -349,6 +394,13 @@ void analyze_struct_def(ASTNode *node) {
             size = total;
         }
 
+        /* Align member offset based on type size (1, 4, or 8 bytes) */
+        int align = (m->pointer_level > 0) ? 8 : 4;
+        if (m->type == TYPE_CHAR && m->pointer_level == 0) align = 1;
+        if (m->type == TYPE_STRUCT && m->pointer_level == 0) align = 8; /* Conservative alignment for structs */
+        
+        offset = (offset + align - 1) & ~(align - 1);
+
         m->struct_offset = offset;
         offset += size;
         m->next_member = sym->members;
@@ -370,20 +422,23 @@ void analyze_struct_def(ASTNode *node) {
         Symbol *v = sym->virtual_methods;
         while (v) {
             v->vtable_index = idx++;
-            v = v->next_member;
+            v = v->next_virtual;
         }
         sym->vtable_size = idx;
     } else if (sym->virtual_methods && has_base_vtable) {
         int idx = 0;
-        Symbol *b_v = sym->base_class->virtual_methods;
-        while (b_v) { idx++; b_v = b_v->next_member; }
+        Symbol *b_v_search = sym->base_class->virtual_methods;
+        while (b_v_search) {
+            if (b_v_search->vtable_index >= idx) idx = b_v_search->vtable_index + 1;
+            b_v_search = b_v_search->next_virtual;
+        }
         
         Symbol *v = sym->virtual_methods;
         while (v) {
             if (v->vtable_index == -1) {
                 v->vtable_index = idx++;
             }
-            v = v->next_member;
+            v = v->next_virtual;
         }
         sym->vtable_size = idx;
     }
@@ -392,20 +447,37 @@ void analyze_struct_def(ASTNode *node) {
 
 }
 
-void analyze_function(ASTNode *node) {
+void analyze_function(ASTNode *node, const char *unmangled_name) {
     Symbol *func = create_symbol(
         node->str_val,
         node->left->data_type,
         SYM_FUNCTION,
         node->line_number
     );
+    func->pointer_level = node->left->pointer_level;
+
+    if (current_class) {
+        func->defining_struct = current_class;
+        func->next_member = current_class->members;
+        current_class->members = func;
+    }
 
     if (!insert_symbol(func)) {
         semantic_error(node->line_number, "Function redeclared");
         return;
     }
 
+    if (node->left->data_type == TYPE_STRUCT && node->left->str_val) {
+        Symbol *struct_sym = lookup(node->left->str_val);
+        if (struct_sym && struct_sym->kind == SYM_STRUCT) {
+            func->struct_def = struct_sym;
+        }
+    }
+
     current_function = func;
+    if (unmangled_name) {
+        func->unmangled_name = strdup(unmangled_name);
+    }
     int count = 0;
     ASTNode *param = node->params;
 
@@ -418,6 +490,8 @@ void analyze_function(ASTNode *node) {
 
     if (count > 0) {
         func->param_types = malloc(sizeof(DataType) * count);
+        func->param_pointer_levels = malloc(sizeof(int) * count);
+        func->param_struct_defs = malloc(sizeof(Symbol*) * count);
         func->param_is_array = malloc(sizeof(int) * count);
         func->param_names = malloc(sizeof(char*) * count);
     }
@@ -426,6 +500,14 @@ void analyze_function(ASTNode *node) {
     int i = 0;
     while (param) {
         func->param_types[i] = param->left->data_type;
+        func->param_pointer_levels[i] = param->pointer_level;
+        func->param_struct_defs[i] = NULL;
+        if (param->left->data_type == TYPE_STRUCT && param->left->str_val) {
+            Symbol *struct_sym = lookup(param->left->str_val);
+            if (struct_sym && struct_sym->kind == SYM_STRUCT) {
+                func->param_struct_defs[i] = struct_sym;
+            }
+        }
         func->param_is_array[i] = (param->int_val != 0);
         func->param_names[i] = strdup(param->str_val);
         param = param->next;
@@ -437,8 +519,6 @@ void analyze_function(ASTNode *node) {
     param = node->params;
     i = 0;
     current_local_offset = 0;
-    current_param_offset = 16;
-
     while (param) {
         Symbol *sym = create_symbol(
             param->str_val,
@@ -447,7 +527,7 @@ void analyze_function(ASTNode *node) {
             param->line_number
         );
 
-        sym->pointer_level = param->left->pointer_level;
+        sym->pointer_level = param->pointer_level;
         if (param->left->data_type == TYPE_STRUCT && param->left->str_val) {
             Symbol *struct_sym = lookup(param->left->str_val);
             if (struct_sym && struct_sym->kind == SYM_STRUCT) {
@@ -460,8 +540,8 @@ void analyze_function(ASTNode *node) {
             sym->array_size = -1; 
         }
 
-        sym->frame_offset = current_param_offset;
-        current_param_offset += 8; 
+        current_local_offset += 8;
+        sym->frame_offset = -current_local_offset;
 
         if (!insert_symbol(sym))
             semantic_error(param->line_number, "Parameter redeclared");
@@ -549,16 +629,15 @@ void analyze_declaration(ASTNode *node) {
 
     if (node->right) {
         analyze_node(node->right);
-        if (!types_compatible(node->left->data_type, sym->pointer_level, sym->struct_def,
-                              node->right->data_type, node->right->pointer_level, node->right->struct_def)) {
+        if (!types_compatible(node->right->data_type, node->right->pointer_level, node->right->struct_def,
+                              sym->type, sym->pointer_level, sym->struct_def)) {
             semantic_error(node->line_number, "Type mismatch in initialization");
         }
         
-        if (node->right->type == NODE_CONST_INT) {
-            if (sym->is_const) {
-                sym->has_const_value = 1;
-                sym->const_value = node->right->int_val;
-            }
+        if (node->right->type == NODE_CONST_INT && sym->is_const) {
+            /* Store constant value for array size resolution ONLY if actually 'const' */
+            sym->has_const_value = 1;
+            sym->const_value = node->right->int_val;
         }
     }
 }
@@ -582,8 +661,14 @@ void analyze_variable(ASTNode *node) {
     
     if (!sym) {
         /* If the variable isn't in local scope, check if we are inside a class method */
-        if (current_class) {
-            Symbol *member = find_struct_member(current_class, node->str_val);
+        Symbol *class_sym = NULL;
+        if (current_function && current_function->defining_struct) {
+            class_sym = current_function->defining_struct;
+        } else if (current_class) {
+            class_sym = current_class;
+        }
+        if (class_sym) {
+            Symbol *member = find_struct_member(class_sym, node->str_val);
             if (member) {
                 /* Implicit 'this->' resolution! 
                    Transform this NODE_VAR into a NODE_MEMBER_ACCESS (this->var) */
@@ -595,7 +680,7 @@ void analyze_variable(ASTNode *node) {
                 this_node->str_val = strdup("this");
                 this_node->data_type = TYPE_STRUCT;
                 this_node->pointer_level = 1;
-                this_node->struct_def = current_class;
+                this_node->struct_def = class_sym;
                 this_node->line_number = node->line_number;
                 
                 node->left = this_node;
@@ -608,6 +693,8 @@ void analyze_variable(ASTNode *node) {
                 node->member_sym = member;
                 node->member_offset = member->struct_offset;
                 return;
+            } else {
+                fprintf(stderr, "DEBUG: failed implicit member lookup '%s' in class '%s'\n", node->str_val, class_sym->name);
             }
         }
         
@@ -657,8 +744,19 @@ void analyze_member_access(ASTNode *node) {
 
     Symbol *member = find_struct_member(struct_def, node->str_val);
     if (!member) {
-        node->data_type = TYPE_VOID;
-        node->member_offset = 0;
+        // Check if it's a member function
+        char mangled[256];
+        snprintf(mangled, sizeof(mangled), "%s_%s", struct_def->name, node->str_val);
+        Symbol *func = lookup(mangled);
+        if (func && func->kind == SYM_FUNCTION) {
+            // Do NOT transform here; let analyze_function_call handle it to correctly identify member calls
+            node->data_type = func->type;
+            node->pointer_level = func->pointer_level;
+            node->struct_def = func->struct_def;
+            return;
+        }
+        semantic_error(node->line_number, "Struct member not found");
+        node->data_type = TYPE_INT;
         return;
     }
 
@@ -690,8 +788,8 @@ void analyze_assignment(ASTNode *node) {
         semantic_error(node->line_number, "Assignment to const variable");
     }
 
-    if (!types_compatible(node->left->data_type, node->left->pointer_level, node->left->struct_def,
-                          node->right->data_type, node->right->pointer_level, node->right->struct_def)) {
+    if (!types_compatible(node->right->data_type, node->right->pointer_level, node->right->struct_def,
+                          node->left->data_type, node->left->pointer_level, node->left->struct_def)) {
         semantic_error(node->line_number, "Assignment type mismatch");
     }
     node->data_type = node->left->data_type;
@@ -700,15 +798,47 @@ void analyze_assignment(ASTNode *node) {
 void analyze_binary(ASTNode *node) {
     analyze_node(node->left);
     analyze_node(node->right);
+
+    /* Check if this is a comparison operator */
+    int is_comparison = (node->int_val == T_EQ || node->int_val == T_NEQ ||
+                        node->int_val == '<' || node->int_val == '>' ||
+                        node->int_val == T_LE || node->int_val == T_GE);
+
+    if (is_comparison) {
+        /* For comparisons, result is always int */
+        node->data_type = TYPE_INT;
+        node->pointer_level = 0;
+
+        /* Allow comparisons between compatible types (symmetric) */
+        if (types_compatible(node->left->data_type, node->left->pointer_level, node->left->struct_def,
+                             node->right->data_type, node->right->pointer_level, node->right->struct_def) ||
+            types_compatible(node->right->data_type, node->right->pointer_level, node->right->struct_def,
+                             node->left->data_type, node->left->pointer_level, node->left->struct_def)) {
+            return;
+        }
+
+        /* Allow pointer compared to NULL (void*) */
+        if ((node->left->pointer_level > 0 && (is_null_constant(node->right) || is_void_pointer(node->right->data_type, node->right->pointer_level))) ||
+            (node->right->pointer_level > 0 && (is_null_constant(node->left) || is_void_pointer(node->left->data_type, node->left->pointer_level)))) {
+            return;
+        }
+
+        semantic_error(node->line_number, "Comparison operand type mismatch");
+        return;
+    }
+
     if (node->left->data_type == TYPE_VOID || node->right->data_type == TYPE_VOID) return;
 
+    /* For arithmetic operators, require exact type match */
     if (node->left->data_type == node->right->data_type &&
         node->left->pointer_level == node->right->pointer_level) {
         node->data_type = node->left->data_type;
         node->pointer_level = node->left->pointer_level;
+        node->struct_def = node->left->struct_def;
         return;
     }
 
+    /* Pointer arithmetic: pointer +/- int */
     if ((node->int_val == '+' || node->int_val == '-') &&
         ((node->left->pointer_level > 0 && node->right->data_type == TYPE_INT && node->right->pointer_level == 0) ||
          (node->right->pointer_level > 0 && node->left->data_type == TYPE_INT && node->left->pointer_level == 0))) {
@@ -901,7 +1031,7 @@ void analyze_function_call(ASTNode *node) {
                             sym = lookup(v->name);
                             break;
                         }
-                        v = v->next_member;
+                        v = v->next_virtual;
                     }
                     c = c->base_class;
                 }
@@ -952,28 +1082,49 @@ void analyze_function_call(ASTNode *node) {
     node->func_sym = sym;
     arg = node->right;
     int i = 0;
+    int is_member_call = (node->left->type == NODE_MEMBER_ACCESS);
+
+    /* For member calls, check the implicit 'this' parameter */
+    if (is_member_call) {
+        if (!arg) {
+            semantic_error(node->line_number, "Missing 'this' argument for member call");
+            return;
+        }
+        /* 'this' should be a pointer to the defining struct */
+        if (!types_compatible(arg->data_type, arg->pointer_level, arg->struct_def,
+                              TYPE_STRUCT, 1, sym->defining_struct)) {
+            semantic_error(node->line_number, "Invalid 'this' argument type");
+        }
+        arg = arg->next;
+        i = 0;  /* Start checking explicit args at param index 0 */
+        /* Now arg points to the first explicit argument */
+    }
 
     while (arg) {
-        if (i >= sym->param_count) {
+        if (i >= (is_member_call ? sym->param_count - 1 : sym->param_count)) {
             semantic_error(node->line_number, "Too many arguments");
             break;
         }
         
-        /* Type compatibility check with void* implicit conversion support */
-        int param_pointer_level = 0;
-        if (i < sym->param_count) {
-            if (sym->param_types[i] == TYPE_VOID) {
-                /* For parameters, we assume void* if type is void and function likely uses it as pointer */
-                /* This is a heuristic; for built-ins like free, we treat void params as void* */
-                if (strcmp(sym->name, "free") == 0) {
-                    param_pointer_level = 1;
-                }
+        /* Type compatibility check: for member calls, account for the 'this' pointer in param_types[0] */
+        int param_idx = is_member_call ? i + 1 : i;
+
+        int param_pointer_level = (sym->param_pointer_levels ? sym->param_pointer_levels[param_idx] : 0);
+        Symbol *param_struct_def = NULL;
+        if (sym->param_struct_defs) {
+            param_struct_def = sym->param_struct_defs[param_idx];
+        }
+        
+        if (sym->param_types[param_idx] == TYPE_VOID && param_pointer_level == 0) {
+            /* For parameters, we assume void* if type is void and function likely uses it as pointer */
+            if (strcmp(sym->name, "free") == 0) {
+                param_pointer_level = 1;
             }
         }
         
         if (!types_compatible(arg->data_type, arg->pointer_level, arg->struct_def,
-                              sym->param_types[i], param_pointer_level, NULL)) {
-            if (!(i == 0 && sym->param_types[0] == TYPE_STRUCT && arg->data_type == TYPE_STRUCT)) {
+                              sym->param_types[param_idx], param_pointer_level, param_struct_def)) {
+            if (!(param_idx == 0 && sym->param_types[0] == TYPE_STRUCT && arg->data_type == TYPE_STRUCT)) {
                 semantic_error(node->line_number, "Argument type mismatch");
             }
         }
@@ -981,9 +1132,10 @@ void analyze_function_call(ASTNode *node) {
         i++;
     }
 
-    if (i < sym->param_count) semantic_error(node->line_number, "Too few arguments");
+    if (i < (is_member_call ? sym->param_count - 1 : sym->param_count)) semantic_error(node->line_number, "Too few arguments");
     node->data_type = sym->type;
     node->pointer_level = sym->pointer_level;  /* Set return type pointer level */
+    node->struct_def = sym->struct_def;        /* Set return type struct definition */
 }
 
 int analyze_return(ASTNode *node) {
@@ -993,8 +1145,10 @@ int analyze_return(ASTNode *node) {
    }
    if (node->left){ 
     analyze_node(node->left);
-    if (node->left->data_type != current_function->type)
+    if (!types_compatible(node->left->data_type, node->left->pointer_level, node->left->struct_def,
+                          current_function->type, current_function->pointer_level, current_function->struct_def)) {
         semantic_error(node->line_number, "Return type mismatch");
+    }
    } else { 
        if(current_function->type != TYPE_VOID) semantic_error(node->line_number, "Return type mismatch");
    }
@@ -1132,11 +1286,84 @@ static void analyze_printf_scanf(ASTNode *node, int is_scanf) {
     }
 }
 
+void analyze_new(ASTNode *node) {
+    DataType type = TYPE_INT;
+    Symbol *struct_def = NULL;
+
+    if (strcmp(node->str_val, "int") == 0) {
+        type = TYPE_INT;
+    } else if (strcmp(node->str_val, "char") == 0) {
+        type = TYPE_CHAR;
+    } else if (strcmp(node->str_val, "void") == 0) {
+        type = TYPE_VOID;
+    } else {
+        Symbol *sym = lookup(node->str_val);
+        if (sym && sym->kind == SYM_STRUCT) {
+            type = TYPE_STRUCT;
+            struct_def = sym;
+        } else {
+            semantic_error(node->line_number, "Unknown type in new expression");
+        }
+    }
+
+    node->data_type = type;
+    node->struct_def = struct_def;
+    node->pointer_level = 1;
+
+    if (type == TYPE_STRUCT && struct_def) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "%s__ctor", struct_def->name);
+        Symbol *ctor = lookup(buf);
+        node->func_sym = ctor;
+
+        ASTNode *arg = node->params;
+        while (arg) {
+            analyze_node(arg);
+            arg = arg->next;
+        }
+
+        /* Check constructor arguments (skipping implicit 'this' in ctor->param_types[0]) */
+        if (ctor && ctor->param_count > 0) {
+            arg = node->params;
+            int i = 0;
+            while (arg && i < ctor->param_count - 1) {
+                int param_idx = i + 1; // Skip 'this'
+                int param_pointer_level = (ctor->param_pointer_levels ? ctor->param_pointer_levels[param_idx] : 0);
+                if (!types_compatible(arg->data_type, arg->pointer_level, arg->struct_def,
+                                      ctor->param_types[param_idx], param_pointer_level, NULL)) {
+                    semantic_error(node->line_number, "Argument type mismatch");
+                }
+                arg = arg->next;
+                i++;
+            }
+            if (i < ctor->param_count - 1) semantic_error(node->line_number, "Too few arguments to constructor");
+            if (arg) semantic_error(node->line_number, "Too many arguments to constructor");
+        }
+    }
+}
+
+void analyze_delete(ASTNode *node) {
+    analyze_node(node->left);
+    if (!node->left || node->left->pointer_level == 0) {
+        semantic_error(node->line_number, "delete operand must be a pointer");
+        return;
+    }
+
+    if (node->left->data_type == TYPE_STRUCT && node->left->struct_def) {
+        Symbol *sd = node->left->struct_def;
+        char buf[256];
+        snprintf(buf, sizeof(buf), "%s__dtor", sd->name);
+        Symbol *dtor = lookup(buf);
+        node->func_sym = dtor;
+    }
+    node->data_type = TYPE_VOID;
+}
+
 int analyze_node(ASTNode *node) {
     if (!node) return 0;
     switch(node->type) {
         case NODE_STRUCT_DEF: analyze_struct_def(node); return 0;
-        case NODE_FUNC_DEF: analyze_function(node); return 0;
+        case NODE_FUNC_DEF: analyze_function(node, NULL); return 0;
         case NODE_VAR_DECL: analyze_declaration(node); return 0;
         case NODE_ARRAY_DECL: analyze_declaration(node); return 0;
         case NODE_BLOCK: return analyze_block(node);
@@ -1167,6 +1394,8 @@ int analyze_node(ASTNode *node) {
         case NODE_STR_LIT: node->data_type = TYPE_CHAR; return 0;
         case NODE_VAR: analyze_variable(node); return 0;
         case NODE_FUNC_CALL: analyze_function_call(node); return 0;
+        case NODE_NEW: analyze_new(node); return 0;
+        case NODE_DELETE: analyze_delete(node); return 0;
         case NODE_PRINTF: analyze_printf_scanf(node, 0); return 0;
         case NODE_SCANF: analyze_printf_scanf(node, 1); return 0;
         case NODE_TYPE:

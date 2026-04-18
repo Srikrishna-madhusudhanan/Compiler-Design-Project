@@ -8,7 +8,7 @@ void semantic_analyze(ASTNode *node);
 
 int analyze_node(ASTNode *node);
 
-void analyze_function(ASTNode *node);
+void analyze_function(ASTNode *node, const char *unmangled_name);
 
 void analyze_declaration(ASTNode *node);
 

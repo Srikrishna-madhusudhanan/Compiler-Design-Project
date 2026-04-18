@@ -37,6 +37,8 @@ void free_symbol_list(Symbol *sym) {
         free(temp->name);
         if (temp->param_types)
             free(temp->param_types);
+        if (temp->param_pointer_levels)
+            free(temp->param_pointer_levels);
         if (temp->param_is_array)
             free(temp->param_is_array);
         // New: free array fields
@@ -105,9 +107,12 @@ Symbol *create_symbol(char *name, DataType type,
 
     sym->param_count = 0;
     sym->param_types = NULL;
+    sym->param_pointer_levels = NULL;
+    sym->param_struct_defs = NULL;
     sym->param_is_array = NULL;
     sym->next = NULL;
     sym->next_member = NULL;
+    sym->next_virtual = NULL;
     sym->scope = NULL;
     sym->vtable_index = -1;
     sym->is_address_taken = 0;
@@ -322,7 +327,7 @@ void print_scope(Scope *scope) {
                 }
                 if (sym->virtual_methods) {
                     printf(" | Virtual Methods:");
-                    for (Symbol *m = sym->virtual_methods; m; m = m->next_member) {
+                    for (Symbol *m = sym->virtual_methods; m; m = m->next_virtual) {
                         printf(" %s(v_idx=%d)", m->name, m->vtable_index);
                     }
                 }

@@ -57,7 +57,7 @@ ASTNode *root = NULL;
 
 /* Tokens */
 %token <intval> T_INT T_VOID T_CHAR T_STRUCT T_VIRTUAL T_CLASS T_PUBLIC T_PRIVATE T_COLON
-%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST
+%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST T_NEW T_DELETE
 %token <str>    T_IDENT T_STRING_LIT
 %token <intval> T_NUMBER T_CHAR_LIT
 %token <intval> T_ARROW T_TILDE
@@ -123,6 +123,16 @@ function_definition
     }
     | type_specifier T_IDENT '(' ')' compound_statement {
         $$ = create_func_def($1, $2, NULL, $5);
+        SET_LINE($$);
+    }
+    | type_specifier pointer T_IDENT '(' parameter_list ')' compound_statement {
+        $1->pointer_level = $2->int_val;
+        $$ = create_func_def($1, $3, $5, $7);
+        SET_LINE($$);
+    }
+    | type_specifier pointer T_IDENT '(' ')' compound_statement {
+        $1->pointer_level = $2->int_val;
+        $$ = create_func_def($1, $3, NULL, $6);
         SET_LINE($$);
     }
     ;
@@ -444,6 +454,11 @@ statement
         $$ = create_scanf_node(fmt, $5);
         SET_LINE($$);
     }
+    | T_DELETE expression ';' {
+        $$ = create_node(NODE_DELETE);
+        SET_LINE($$);
+        $$->left = $2;
+    }
     ;
 
 compound_statement
@@ -748,6 +763,25 @@ unary_expression
         $$ = create_unary_node(T_DEC, $2);
         $$->type = NODE_PRE_DEC;
         SET_LINE($$);
+    }
+    | T_NEW T_IDENT '(' argument_expression_list ')' {
+        $$ = create_node(NODE_NEW);
+        SET_LINE($$);
+        $$->str_val = strdup($2);
+        $$->params = $4;
+    }
+    | T_NEW T_IDENT '(' ')' {
+        $$ = create_node(NODE_NEW);
+        SET_LINE($$);
+        $$->str_val = strdup($2);
+        $$->params = NULL;
+    }
+    | T_NEW T_IDENT {
+        /* Support for 'new int' etc. without parens */
+        $$ = create_node(NODE_NEW);
+        SET_LINE($$);
+        $$->str_val = strdup($2);
+        $$->params = NULL;
     }
     ;
 
