@@ -411,13 +411,9 @@ static IRInstr *schedule_block(IRInstr *first, IRInstr *last, int count) {
 void ir_schedule_function(IRFunc *f) {
     if (!f || !f->instrs) return;
     
-    /* Identify Basic Blocks implicitly.
-     * We slice the instruction stream at labels and branch/jump/returns,
-     * and schedule each segment.
-     */
     IRInstr *curr = f->instrs;
     IRInstr *first_of_block = curr;
-    IRInstr *prev_of_block = NULL; /* tail of the previous block */
+    IRInstr *prev_of_block = NULL;
     IRInstr *new_func_head = NULL;
     int bcount = 0;
     
@@ -426,29 +422,19 @@ void ir_schedule_function(IRFunc *f) {
         int ends_block = is_barrier(curr) || (curr->next && curr->next->kind == IR_LABEL);
         
         if (ends_block || !curr->next) {
-            /* Schedule the block [first_of_block ... curr] */
             IRInstr *next_block = curr->next;
-            
-            /* Temporarily sever the block */
             curr->next = NULL;
             
             IRInstr *s_head = schedule_block(first_of_block, curr, bcount);
-            
-            /* Find the new tail of this scheduled block */
             IRInstr *s_tail = s_head;
             while (s_tail && s_tail->next) s_tail = s_tail->next;
             
-            /* Link it to the global list */
-            if (prev_of_block) {
-                prev_of_block->next = s_head;
-            } else {
-                new_func_head = s_head;
-            }
-            /* Reconnect this scheduled block to the next block in the function. */
+            if (prev_of_block) prev_of_block->next = s_head;
+            else new_func_head = s_head;
+            
             s_tail->next = next_block;
             prev_of_block = s_tail;
             
-            /* Reset for next block */
             first_of_block = next_block;
             curr = next_block;
             bcount = 0;
@@ -456,6 +442,95 @@ void ir_schedule_function(IRFunc *f) {
             curr = curr->next;
         }
     }
-    
     f->instrs = new_func_head;
+}
+
+void ir_schedule_export_json(IRFunc *f, const char *path) {
+    if (!f || !path) return;
+    FILE *fp = fopen(path, "w");
+    if (!fp) return;
+
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"func_name\": \"%s\",\n", f->name);
+    fprintf(fp, "  \"blocks\": [\n");
+
+    IRInstr *curr = f->instrs;
+    IRInstr *first_of_block = curr;
+    int bcount = 0;
+    int block_id = 1;
+
+    while (curr) {
+        bcount++;
+        int ends_block = is_barrier(curr) || (curr->next && curr->next->kind == IR_LABEL);
+        
+        if (ends_block || !curr->next) {
+            /* Analyze block [first_of_block ... curr] */
+            IRInstr *next_block = curr->next;
+            curr->next = NULL;
+
+            fprintf(fp, "    {\n");
+            fprintf(fp, "      \"id\": %d,\n", block_id++);
+            
+            /* Build DAG temporarily to export */
+            int count = bcount;
+            SchedNode *nodes = calloc(count, sizeof(SchedNode));
+            IRInstr *it = first_of_block;
+            for (int i = 0; i < count; i++) {
+                nodes[i].instr = it;
+                nodes[i].index = i;
+                nodes[i].is_barrier = is_barrier(it);
+                nodes[i].is_load = (it->kind == IR_LOAD);
+                nodes[i].is_store = (it->kind == IR_STORE);
+                nodes[i].is_call = (it->kind == IR_CALL || it->kind == IR_CALL_INDIRECT);
+                it = it->next;
+            }
+            build_dag(nodes, count);
+            compute_priorities(nodes, count);
+
+            /* Nodes */
+            fprintf(fp, "      \"nodes\": [\n");
+            for (int i = 0; i < count; i++) {
+                char buf[128];
+                ir_snprint_instr(buf, sizeof(buf), nodes[i].instr);
+                fprintf(fp, "        {\"id\": %d, \"label\": \"%s\", \"priority\": %d}%s\n",
+                        i, buf, nodes[i].est_completion_time, (i == count - 1) ? "" : ",");
+            }
+            fprintf(fp, "      ],\n");
+
+            /* Edges */
+            fprintf(fp, "      \"edges\": [\n");
+            int first_edge = 1;
+            for (int i = 0; i < count; i++) {
+                for (SchedEdge *e = nodes[i].succs; e; e = e->next) {
+                    if (!first_edge) fprintf(fp, ",\n");
+                    fprintf(fp, "        {\"from\": %d, \"to\": %d}", i, e->target->index);
+                    first_edge = 0;
+                }
+            }
+            fprintf(fp, "\n      ]\n");
+
+            /* Cleanup nodes and edges */
+            for (int i = 0; i < count; i++) {
+                SchedEdge *e = nodes[i].succs;
+                while (e) { SchedEdge *ne = e->next; free(e); e = ne; }
+                e = nodes[i].preds;
+                while (e) { SchedEdge *ne = e->next; free(e); e = ne; }
+            }
+            free(nodes);
+
+            fprintf(fp, "    }%s\n", (next_block) ? "," : "");
+
+            /* Restore tail */
+            curr->next = next_block;
+            first_of_block = next_block;
+            curr = next_block;
+            bcount = 0;
+        } else {
+            curr = curr->next;
+        }
+    }
+
+    fprintf(fp, "  ]\n");
+    fprintf(fp, "}\n");
+    fclose(fp);
 }

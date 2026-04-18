@@ -17,5 +17,6 @@ int main() {
         res = 999;
     }
 
+    printf("%d\n", res);
     return res;
 }

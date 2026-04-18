@@ -144,6 +144,16 @@ body.has-maximized .resizer-v {
     flex: 1;
     overflow: auto;
     position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+#ra-viz {
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    border-radius: 8px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
 }
 
 /* Specific content styles */
@@ -161,10 +171,11 @@ body.has-maximized .resizer-v {
     line-height: 1.5;
 }
 
-#ast-viz, #ra-viz, #cfg-viz {
+#ast-viz, #ra-viz, #cfg-viz, #sched-viz {
     width: 100%;
     height: 100%;
 }
+#sched-panel { min-height: 200px; flex: 1.5; }
 
 #cfg-panel { flex: 1; min-height: 100px; }
 
@@ -317,4 +328,137 @@ select {
     border-radius: 4px;
     outline: none;
     font-size: 0.9rem;
+}
+/* Register Allocation Enhanced Visualization */
+.ra-viz-grid {
+    display: flex;
+    flex-direction: row;
+    height: 500px;
+    width: 100%;
+    gap: 15px;
+    padding: 15px;
+    background: #0f172a;
+}
+
+#ra-viz {
+    flex: 1.4;
+    height: 100%;
+    min-width: 0;
+    background: #1e293b;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+}
+
+#ra-stack-container {
+    flex: 0.6;
+    min-width: 0;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.stack-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.ra-stack {
+    width: 80%;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 4px;
+    overflow-y: auto;
+}
+
+.ra-stack-item {
+    background: var(--card-bg);
+    border: 1px solid var(--accent-color);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+}
+
+.ra-stack-item.spill {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Register Usage Map */
+.usage-map-panel {
+    height: 350px !important;
+}
+
+.usage-table-container {
+    padding: 10px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+}
+
+.usage-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.usage-table th {
+    text-align: left;
+    color: var(--text-secondary);
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.usage-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.instr-line {
+    color: #ffd700;
+    width: 250px;
+}
+
+.live-tags {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.live-tag {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent-color);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.live-tag.active {
+    background: var(--accent-color);
+    color: var(--bg-color);
+}
+
+/* Step Indicator */
+.step-info {
+    font-size: 0.75rem;
+    padding: 5px 10px;
+    color: var(--accent-color);
+    background: rgba(56, 189, 248, 0.1);
+    border-radius: 4px;
+    margin-bottom: 10px;
 }

@@ -132,56 +132,176 @@ async function animateAst(ast) {
     log('AST Animation complete.', 'success');
 }
 
-// RA Animation (Step-by-step coloring)
+// RA Animation (Detailed Simplify/Select Trace)
 async function animateRa(data) {
     if (!data || !data.nodes || data.nodes.length === 0) {
-        log('No allocatable variables found. Try O0 or more complex code!', 'warning');
+        log('No register allocation data available.', 'warning');
         return;
     }
-    log('Starting Register Allocation Animation...', 'info');
+    log('Starting premium Register Allocation Trace...', 'info');
     
+    const stackEl = document.getElementById('ra-stack');
+    stackEl.innerHTML = ''; // Reset stack
+    
+    // Premium Vibrant Palette (Glassmorphism & Neon)
+    const palette = [
+        "#38bdf8", "#818cf8", "#c084fc", "#f472b6", "#fb7185", 
+        "#fb923c", "#fbbf24", "#a3e635", "#4ade80", "#2dd4bf",
+        "#22d3ee", "#60a5fa", "#a78bfa", "#e879f9", "#f43f5e"
+    ];
+
     const nodes = new vis.DataSet(data.nodes.map(n => ({ 
         id: n.id, 
         label: n.name, 
-        color: '#334155', // Uncolored initially
-        font: { color: '#fff' }
+        color: {
+            background: '#334155',
+            border: '#475569'
+        },
+        font: { color: '#ffffff', face: 'Inter', size: 16 },
+        size: 25,
+        shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 5 }
     })));
-    const edges = new vis.DataSet(data.edges);
+    
+    const edges = new vis.DataSet(data.edges.map(e => ({
+        ...e,
+        color: { color: '#475569', highlight: '#38bdf8' },
+        width: 2
+    })));
+
     const container = document.getElementById('ra-viz');
     const options = {
-        physics: { enabled: true, stabilization: true },
-        nodes: { shape: 'dot', size: 20 }
+        physics: {
+            enabled: true,
+            barnesHut: { gravitationalConstant: -2000, centralGravity: 0.3, springLength: 100 },
+            stabilization: { iterations: 100 }
+        },
+        nodes: { shape: 'dot' },
+        edges: { width: 2 }
     };
     
     raNetwork = new vis.Network(container, { nodes, edges }, options);
-
-    raNetwork.on("stabilizationIterationsDone", function () {
-        raNetwork.setOptions( { physics: false } );
-    });
-
-    // Fallback: If it takes too long to stabilize, force stop physics
-    setTimeout(() => {
-        if (raNetwork) {
-            raNetwork.setOptions({ physics: false });
-        }
-    }, 3000);
     
-    const palette = ["#FAD7A0", "#D2B4DE", "#F1948A", "#A3E4D7", "#85C1E9", "#82E0AA", "#F8C471", "#F0B27A", "#C39BD3", "#7FB3D3"];
+    // Responsive fit logic
+    const fitNetwork = () => {
+        if (raNetwork) raNetwork.fit({ animation: { duration: 1000, easingFunction: 'easeInOutQuad' } });
+    };
+
+    raNetwork.once('stabilizationIterationsDone', fitNetwork);
+    window.addEventListener('resize', fitNetwork);
     
-    // Simulate Pop and Color
-    const stack = [...data.stack].reverse(); // Popping Order
-    for (let nodeId of stack) {
-        const nodeData = data.nodes.find(n => n.id === nodeId);
-        await new Promise(r => setTimeout(r, 300));
+    // Ensure we clean up old listeners if we re-run
+    raNetwork.on('destroy', () => window.removeEventListener('resize', fitNetwork));
+
+    // 1. Simplify Phase (Pushing to stack)
+    for (let step of data.simplify_history) {
+        const nodeData = data.nodes[step.node_idx];
+        await new Promise(r => setTimeout(r, 450));
+        
+        // Highlight in graph - change to a ghost-like state
+        nodes.update({ 
+            id: step.node_idx, 
+            color: { background: '#0f172a', border: '#1e293b' },
+            font: { color: '#64748b' },
+            size: 15
+        });
+        
+        // Add to visual stack with animation
+        const item = document.createElement('div');
+        item.className = `ra-stack-item ${step.potential_spill ? 'spill' : ''}`;
+        item.style.borderLeft = `4px solid ${step.potential_spill ? '#ef4444' : '#38bdf8'}`;
+        item.innerHTML = `<div style="display:flex; justify-content:space-between; width:100%;">
+            <span style="font-weight:700;">${nodeData.name}</span>
+            <span style="opacity:0.6; font-size:0.7rem;">deg:${step.degree}</span>
+        </div>`;
+        stackEl.appendChild(item);
+    }
+
+    await new Promise(r => setTimeout(r, 800));
+
+    // 2. Select Phase (Popping and coloring)
+    const stackItems = Array.from(stackEl.children);
+    for (let i = stackItems.length - 1; i >= 0; i--) {
+        const step = data.simplify_history[i];
+        const nodeData = data.nodes[step.node_idx];
+        const stackItem = stackItems[i];
+        
+        await new Promise(r => setTimeout(r, 450));
+        
+        stackItem.style.boxShadow = '0 0 15px var(--accent-color)';
+        stackItem.style.background = 'rgba(56, 189, 248, 0.2)';
         
         if (nodeData.spilled) {
-            nodes.update({ id: nodeId, color: '#ef4444', label: `${nodeData.name}\n(SPILL)` });
+            nodes.update({ 
+                id: step.node_idx, 
+                color: { background: '#ef4444', border: '#f87171' },
+                font: { color: '#ffffff', size: 18 },
+                size: 35,
+                label: `${nodeData.name}\n(SPILL)`,
+                shadow: { enabled: true, color: 'rgba(239, 68, 68, 0.8)', size: 15 }
+            });
         } else if (nodeData.color >= 0) {
             const color = palette[nodeData.color % palette.length];
-            nodes.update({ id: nodeId, color: color, font: { color: '#fff' } });
+            const regName = data.reg_names ? data.reg_names[nodeData.color] : nodeData.color;
+            nodes.update({ 
+                id: step.node_idx, 
+                color: { background: color, border: '#ffffff' },
+                font: { color: '#ffffff', size: 18 },
+                size: 35,
+                label: `${nodeData.name}\n(${regName})`,
+                shadow: { enabled: true, color: color, size: 20 }
+            });
         }
+        
+        await new Promise(r => setTimeout(r, 200));
+        stackItem.style.transform = 'translateX(100%)';
+        stackItem.style.opacity = '0';
+        setTimeout(() => stackItem.remove(), 300);
     }
+    
     log('Register Allocation coloring complete.', 'success');
+}
+
+// Register Usage Map Rendering
+function renderRegisterUsage(data) {
+    const body = document.getElementById('usage-body');
+    if (!data || !data.liveness_history) {
+        body.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #444; padding: 20px;">No liveness data.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = '';
+    data.liveness_history.forEach(step => {
+        const tr = document.createElement('tr');
+        
+        const tdIdx = document.createElement('td');
+        tdIdx.textContent = step.idx;
+        
+        const tdInstr = document.createElement('td');
+        tdInstr.className = 'instr-line';
+        tdInstr.textContent = step.instr;
+        
+        const tdLive = document.createElement('td');
+        const tagsDiv = document.createElement('div');
+        tagsDiv.className = 'live-tags';
+        
+        step.live.forEach(varName => {
+            const span = document.createElement('span');
+            span.className = 'live-tag';
+            
+            // Try to find the register for this variable
+            const node = data.nodes.find(n => n.name === varName);
+            const regName = (node && node.color >= 0 && data.reg_names) ? ` (${data.reg_names[node.color]})` : '';
+            
+            span.textContent = varName + regName;
+            tagsDiv.appendChild(span);
+        });
+        
+        tdLive.appendChild(tagsDiv);
+        tr.appendChild(tdIdx);
+        tr.appendChild(tdInstr);
+        tr.appendChild(tdLive);
+        body.appendChild(tr);
+    });
 }
 
 // CFG Rendering
@@ -189,24 +309,29 @@ async function renderCFG(data) {
     if (!data || !data.blocks || data.blocks.length === 0) return;
     log('Rendering Control Flow Graph...', 'info');
 
-    const nodes = new vis.DataSet(data.blocks.map(b => ({
-        id: b.id,
-        label: `B${b.id}\n----------\n${b.instrs.join('\n')}`,
-        shape: 'box',
-        font: { face: 'monospace', align: 'left', size: 12 },
-        color: { background: '#f0f9ff', border: '#0369a1' }
-    })));
+    const nodes = new vis.DataSet(data.blocks.map(b => {
+        // Clean up common IR prefixes for display
+        const cleanInstrs = b.instrs.map(i => i.trim());
+        return {
+            id: b.id,
+            label: `BLOCK ${b.id}\n${'—'.repeat(20)}\n${cleanInstrs.join('\n')}`,
+            shape: 'box',
+            font: { face: 'Fira Code', align: 'left', size: 11, color: '#334155' },
+            color: { background: '#f8fafc', border: '#334155' },
+            margin: 10
+        };
+    }));
 
     const edges = [];
     data.blocks.forEach(b => {
         b.successors.forEach(s => {
-            edges.push({ from: b.id, to: s, arrows: 'to', color: '#0369a1' });
+            edges.push({ from: b.id, to: s, arrows: 'to', color: '#64748b', width: 2 });
         });
     });
 
     const container = document.getElementById('cfg-viz');
     const options = {
-        layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', nodeSpacing: 150 } },
+        layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', nodeSpacing: 150, levelSeparation: 150 } },
         physics: false,
         edges: { smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.5 } }
     };
@@ -249,6 +374,7 @@ compileBtn.addEventListener('click', async () => {
             // Static viz
             renderStaticViz(currentAstData, currentRaData);
             if (currentCfgData) renderCFG(currentCfgData);
+            if (currentRaData) renderRegisterUsage(currentRaData);
         }
     } catch (e) {
         log('Connection error.', 'error');
@@ -451,3 +577,119 @@ setupResizer('resizer-h1', 'h');
 setupResizer('resizer-h2', 'h');
 setupResizer('resizer-v1', 'v');
 setupResizer('resizer-v2', 'v');
+
+// Instruction Scheduling Visualization
+let schedNetwork = null;
+const SCHED_PALETTES = {
+    critical: { bg: '#f97316', border: '#fb923c', glow: 'rgba(249,115,22,0.7)', label: 'Critical Path' },
+    high:     { bg: '#a855f7', border: '#c084fc', glow: 'rgba(168,85,247,0.7)', label: 'High Priority' },
+    mid:      { bg: '#38bdf8', border: '#7dd3fc', glow: 'rgba(56,189,248,0.6)', label: 'Mid Priority' },
+    low:      { bg: '#4ade80', border: '#86efac', glow: 'rgba(74,222,128,0.5)', label: 'Low Priority' },
+    idle:     { bg: '#1e293b', border: '#334155', glow: null,                   label: null }
+};
+
+function getSchedTier(priority, maxPriority) {
+    const ratio = priority / maxPriority;
+    if (ratio >= 0.9) return 'critical';
+    if (ratio >= 0.6) return 'high';
+    if (ratio >= 0.3) return 'mid';
+    return 'low';
+}
+
+async function animateSched() {
+    log('Loading scheduling DAG data...', 'info');
+    try {
+        const response = await fetch('/api/sched/main');
+        if (!response.ok) throw new Error('Scheduling data not found. Compile first.');
+        const data = await response.json();
+        if (!data.blocks || data.blocks.length === 0) {
+            log('No scheduling data. Please compile first.', 'warning');
+            return;
+        }
+
+        const block = data.blocks[0];
+        log(`⚡ Visualizing Dependency DAG — Block ${block.id} (${block.nodes.length} instructions)`, 'info');
+
+        const maxPriority = Math.max(...block.nodes.map(n => n.priority), 1);
+
+        const nodesDataset = new vis.DataSet(block.nodes.map(n => ({
+            id: n.id,
+            label: n.label.trim(),
+            title: `Priority: ${n.priority}`,
+            color: { background: SCHED_PALETTES.idle.bg, border: SCHED_PALETTES.idle.border },
+            font: { color: '#64748b', face: 'Fira Code', size: 12, bold: false },
+            shape: 'box',
+            margin: { top: 8, bottom: 8, left: 12, right: 12 },
+            borderWidth: 1,
+            shadow: false
+        })));
+
+        const edgesDataset = new vis.DataSet(block.edges.map((e, i) => ({
+            id: i,
+            from: e.from,
+            to: e.to,
+            arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+            color: { color: '#1e3a5f', highlight: '#38bdf8', opacity: 0.7 },
+            width: 1.5,
+            smooth: { type: 'curvedCW', roundness: 0.2 },
+            dashes: false
+        })));
+
+        const container = document.getElementById('sched-viz');
+        const options = {
+            layout: { 
+                hierarchical: { 
+                    direction: 'UD', 
+                    sortMethod: 'directed',
+                    nodeSpacing: 160,
+                    levelSeparation: 110
+                } 
+            },
+            physics: false,
+            interaction: { hover: true, tooltipDelay: 100 },
+            nodes: { borderWidth: 2 }
+        };
+
+        if (schedNetwork) schedNetwork.destroy();
+        schedNetwork = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
+        schedNetwork.fit({ animation: { duration: 500 } });
+
+        // ---- Animation: schedule nodes in priority order ----
+        await new Promise(r => setTimeout(r, 800));
+        log('🎬 Animating scheduling order (critical path first)...', 'info');
+
+        const sortedNodes = [...block.nodes].sort((a, b) => b.priority - a.priority);
+
+        for (let node of sortedNodes) {
+            await new Promise(r => setTimeout(r, 700));
+
+            const tier = getSchedTier(node.priority, maxPriority);
+            const pal = SCHED_PALETTES[tier];
+
+            nodesDataset.update({
+                id: node.id,
+                color: { background: pal.bg, border: pal.border },
+                font: { color: '#ffffff', face: 'Fira Code', size: 13, bold: true },
+                shadow: { enabled: true, color: pal.glow, size: 18, x: 0, y: 0 },
+                borderWidth: 2
+            });
+
+            // Highlight outgoing dependency edges
+            const outEdges = block.edges
+                .filter(e => e.from === node.id)
+                .map((e, i) => ({ id: block.edges.indexOf(e), color: { color: pal.border, opacity: 1 }, width: 2.5 }));
+            outEdges.forEach(eu => edgesDataset.update(eu));
+
+            log(`→ Scheduled: "${node.label.trim()}" [${tier.toUpperCase()}, priority: ${node.priority}]`, 
+                tier === 'critical' ? 'warning' : 'success');
+        }
+
+        schedNetwork.fit({ animation: { duration: 800, easingFunction: 'easeInOutQuad' } });
+        log('✅ Instruction scheduling visualization complete.', 'success');
+
+    } catch (err) {
+        log(`Error: ${err.message}`, 'error');
+    }
+}
+
+document.getElementById('anim-sched').addEventListener('click', animateSched);

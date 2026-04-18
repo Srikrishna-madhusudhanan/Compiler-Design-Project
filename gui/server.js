@@ -172,3 +172,13 @@ app.get('/api/examples', (req, res) => {
 app.listen(port, () => {
     console.log(`PaniniC GUI server running at http://localhost:${port}`);
 });
+
+app.get('/api/sched/:func', (req, res) => {
+    const filename = `${req.params.func}_sched.json`;
+    const filepath = path.join(__dirname, '..', filename);
+    if (fs.existsSync(filepath)) {
+        res.sendFile(filepath);
+    } else {
+        res.status(404).send('Not found');
+    }
+});

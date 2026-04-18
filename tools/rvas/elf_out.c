@@ -5,6 +5,7 @@
 #include <string.h>
 
 enum {
+    RV_R_32 = 1,
     RV_R_64 = 2,
     RV_R_BRANCH = 16,
     RV_R_JAL = 17,
@@ -13,6 +14,8 @@ enum {
     RV_R_PCREL_LO12_I = 24,
     RV_R_RELAX = 33,
 };
+
+
 
 static size_t align_up(size_t x, size_t al) {
     return (x + al - 1) & ~(al - 1);
@@ -176,10 +179,13 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
             rtype = RV_R_PCREL_HI20;
         else if (f->kind == RV_FIX_LO12)
             rtype = RV_R_PCREL_LO12_I;
-        else if (f->kind == RV_FIX_ABS64 && f->sec == 3)
+        else if (f->kind == RV_FIX_ABS64)
             rtype = RV_R_64;
+        else if (f->kind == RV_FIX_ABS32)
+            rtype = RV_R_32;
         if (!rtype)
             continue;
+
         Elf64_Rela rel = {.r_offset = f->off,
                           .r_info = ELF64_R_INFO((uint64_t)si, rtype),
                           .r_addend = 0};
@@ -193,10 +199,11 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
                 if (!append_rela(&rt, &rtn, &rtcap, rx))
                     goto fail;
             }
-        } else if (f->sec == 3 && f->kind == RV_FIX_ABS64) {
+        } else if (f->sec == 3) {
             if (!append_rela(&rd, &rdn, &rdcap, rel))
                 goto fail;
         }
+
     }
 
     static const char shstr[] =

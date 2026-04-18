@@ -25,7 +25,10 @@ typedef enum {
     IR_LOAD,        /* t := load base, idx, scale */
     IR_STORE,       /* store base, idx, scale := val */
     IR_CALL_INDIRECT, /* x := call *fn, n */
-    IR_ALLOCA       /* x := alloca size */
+    IR_ALLOCA,      /* x := alloca size */
+    IR_TRY_BEGIN,   /* try_begin label_catch */
+    IR_TRY_END,     /* try_end */
+    IR_THROW        /* throw x */
 } IROpKind;
 
 /* Relational operators for IR_IF */
@@ -139,6 +142,9 @@ IRInstr* ir_make_if(IROperand left, IROperand right, IRRelop relop, char *label,
 IRInstr* ir_make_load(char *dst, IROperand base, IROperand index, int scale, int line);
 IRInstr* ir_make_store(IROperand base, IROperand index, int scale, IROperand value, int line);
 IRInstr* ir_make_alloca(char *dst, IROperand size, int line);
+IRInstr* ir_make_try_begin(char *catch_label, int line);
+IRInstr* ir_make_try_end(int line);
+IRInstr* ir_make_throw(IROperand val, int line);
 
 /* --- Operand helpers --- */
 IROperand ir_op_name(char *name);

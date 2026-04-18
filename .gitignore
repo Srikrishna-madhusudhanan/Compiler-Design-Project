@@ -5,5 +5,31 @@ venv/
 # Outputs
 *.dot
 ir.txt
+ir_opt.txt
+ast.json
+ast.dot
+output.s
+compiler_metrics.txt
 stack_frame_reference.txt
 changes_12_04.md
+toy_linker.md
+
+# CFG and Interference Graphs
+*_cfg.json
+*_interference.json
+*_cfg.dot
+*_interference.dot
+
+# Linker/Assembler Test Binaries
+tools/rvld/tests/*.o
+tools/rvld/tests/*_test
+tools/rvld/tests/cf_test
+tools/rvld/tests/test1
+tools/rvld/tests/test_multi
+tools/rvld/tests/fact
+tools/rvld/tests/sort
+tools/rvld/tests/exit77
+tools/rvld/tests/glob_test
+tools/rvld/tests/bubble_sort_final
+tools/rvld/tests/simple_add_full
+tools/rvld/tests/simple_return_test

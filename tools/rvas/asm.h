@@ -27,7 +27,9 @@ typedef enum {
     RV_FIX_LO12,
     RV_FIX_CALL_PLT,
     RV_FIX_ABS64,
+    RV_FIX_ABS32,
 } RvFixKind;
+
 
 typedef struct {
     RvFixKind kind;

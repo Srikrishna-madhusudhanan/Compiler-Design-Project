@@ -8,6 +8,7 @@
 #include "ir_gen.h"
 #include "ir_opt.h"
 #include "reg_alloc.h"
+#include "ir_sched.h"
 #include "riscv_gen.h"
 #include "compiler_metrics.h"
 
@@ -57,7 +58,7 @@ ASTNode *root = NULL;
 
 /* Tokens */
 %token <intval> T_INT T_VOID T_CHAR T_STRUCT T_VIRTUAL T_CLASS T_PUBLIC T_PRIVATE T_COLON
-%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST T_NEW T_DELETE
+%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST T_TRY T_CATCH T_THROW T_NEW T_DELETE
 %token <str>    T_IDENT T_STRING_LIT
 %token <intval> T_NUMBER T_CHAR_LIT
 %token <intval> T_ARROW T_TILDE
@@ -89,6 +90,7 @@ ASTNode *root = NULL;
 %type <node> equality_expression relational_expression additive_expression
 %type <node> multiplicative_expression unary_expression postfix_expression primary_expression
 %type <node> argument_expression_list
+%type <node> try_statement catch_clause_list catch_clause throw_statement
 %type <node> struct_specifier struct_declaration_list struct_member class_specifier
 
 %%
@@ -436,6 +438,8 @@ statement
     | iteration_statement { $$ = $1; }
     | jump_statement { $$ = $1; }
     | switch_statement { $$ = $1; }
+    | try_statement { $$ = $1; }
+    | throw_statement { $$ = $1; }
     | T_PRINTF '(' T_STRING_LIT ')' ';' {
         ASTNode *fmt = create_str_node($3);
         SET_LINE(fmt);
@@ -546,6 +550,42 @@ jump_statement
     }
     | T_CONTINUE ';' {
         $$ = create_continue_node();
+        SET_LINE($$);
+    }
+    ;
+
+throw_statement
+    : T_THROW expression ';' {
+        $$ = create_throw_node($2);
+        SET_LINE($$);
+    }
+    | T_THROW ';' {
+        $$ = create_throw_node(NULL);
+        SET_LINE($$);
+    }
+    ;
+
+try_statement
+    : T_TRY compound_statement catch_clause_list {
+        $$ = create_try_node($2, $3);
+        SET_LINE($$);
+    }
+    ;
+
+catch_clause_list
+    : catch_clause { $$ = $1; }
+    | catch_clause_list catch_clause {
+        $$ = append_node($1, $2);
+    }
+    ;
+
+catch_clause
+    : T_CATCH '(' expression ')' compound_statement {
+        $$ = create_catch_node($3, $5);
+        SET_LINE($$);
+    }
+    | T_CATCH '(' ')' compound_statement {
+        $$ = create_catch_node(NULL, $4);
         SET_LINE($$);
     }
     ;
@@ -905,6 +945,18 @@ int main(int argc, char **argv) {
                 metrics.post_opt_ir_instructions = compiler_metrics_count_ir_instructions(ir);
                 metrics.post_opt_basic_blocks = compiler_metrics_count_basic_blocks(ir);
             }
+
+            /* Instruction Scheduling */
+            printf("Running instruction scheduling...\n");
+            IRFunc *sf = ir->funcs;
+            while (sf) {
+                ir_schedule_function(sf);
+                char sched_json[128];
+                snprintf(sched_json, sizeof(sched_json), "%s_sched.json", sf->name);
+                ir_schedule_export_json(sf, sched_json);
+                sf = sf->next;
+            }
+            printf("Instruction scheduling complete.\n");
 
             /* Register allocation (Chaitin's graph coloring) */
             printf("Running register allocation...\n");

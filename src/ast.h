@@ -39,7 +39,10 @@ typedef enum {
     NODE_POST_INC,
     NODE_POST_DEC,
     NODE_NEW,
-    NODE_DELETE
+    NODE_DELETE,
+    NODE_TRY,
+    NODE_CATCH,
+    NODE_THROW
 } NodeType;
 
 typedef struct ASTNode {
@@ -126,6 +129,9 @@ ASTNode* create_break_node(void);
 ASTNode* create_continue_node(void);
 ASTNode* create_printf_node(ASTNode *fmt, ASTNode *args);
 ASTNode* create_scanf_node(ASTNode *fmt, ASTNode *args);
+ASTNode* create_try_node(ASTNode *try_body, ASTNode *catch_blocks);
+ASTNode* create_catch_node(ASTNode *expr, ASTNode *catch_body); // expr is type or NULL
+ASTNode* create_throw_node(ASTNode *expr);
 
 // List manipulation
 ASTNode* append_node(ASTNode *head, ASTNode *new_node);

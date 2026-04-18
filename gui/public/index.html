@@ -115,16 +115,65 @@
 
             <div class="resizer-h" id="resizer-h2"></div>
 
-            <div id="right-pane" class="panel">
-                <div class="panel-header">
-                    Register Allocation
-                    <div class="anim-controls">
-                        <button class="anim-btn" id="anim-ra">Animate Coloring</button>
+            <div id="right-pane" style="display: flex; flex-direction: column; width: 550px; overflow-y: auto;">
+                <div id="ra-panel" class="panel" style="flex: 0 0 380px; min-height: 380px;">
+                    <div class="panel-header">
+                        ⚡ Register Allocation (Simplify/Select)
+                        <div class="anim-controls">
+                            <button class="anim-btn" id="anim-ra">Animate Trace</button>
+                        </div>
+                        <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
                     </div>
-                    <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                    <div class="panel-content">
+                        <div class="ra-viz-grid">
+                            <div id="ra-viz"></div>
+                            <div id="ra-stack-container">
+                                <div class="stack-title">Simplify Stack (K=15)</div>
+                                <div id="ra-stack" class="ra-stack">
+                                    <div style="font-size: 0.7rem; color: #444; margin-top: 20px;">Empty</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="panel-content" id="ra-container">
-                    <div id="ra-viz"></div>
+
+                <div class="resizer-v" id="resizer-v-ra"></div>
+
+                <div id="sched-panel" class="panel" style="flex: 0 0 420px; min-height: 420px;">
+                    <div class="panel-header">
+                        🗓 Instruction Scheduling (Dependency DAG)
+                        <div class="anim-controls">
+                            <button class="anim-btn" id="anim-sched">Animate Sched</button>
+                        </div>
+                        <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                    </div>
+                    <div class="panel-content" style="padding: 0;">
+                        <div id="sched-legend" style="display:none; padding:8px 12px; gap:12px; flex-wrap:wrap;"></div>
+                        <div id="sched-viz" style="width:100%; height:100%;"></div>
+                    </div>
+                </div>
+
+                <div class="resizer-v" id="resizer-v-sched"></div>
+
+                <div id="usage-panel" class="panel usage-map-panel">
+                    <div class="panel-header">
+                        Register Usage Map (Per Instruction)
+                        <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
+                    </div>
+                    <div class="panel-content usage-table-container">
+                        <table class="usage-table" id="usage-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Instruction</th>
+                                    <th>Live Variables / Registers</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usage-body">
+                                <tr><td colspan="3" style="text-align: center; color: #444; padding: 20px;">Capture IR to see usage...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

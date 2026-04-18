@@ -589,6 +589,25 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     fprintf(out, "  j %s\n", exit_label);
                     break;
 
+                case IR_TRY_BEGIN:
+                    fprintf(out, "try_begin %s\n", instr->label);
+                    /* Call runtime to push a new jmp_buf and setjmp it */
+                    fprintf(out, "  call __paninic_push_try_context\n");
+                    /* a0 now has the result of setjmp: 0 if first time, non-zero if thrown */
+                    fprintf(out, "  bnez a0, %s\n", instr->label);
+                    break;
+
+                case IR_TRY_END:
+                    fprintf(out, "try_end\n");
+                    fprintf(out, "  call __paninic_pop_try_context\n");
+                    break;
+
+                case IR_THROW:
+                    fprintf(out, "throw\n");
+                    load_operand(out, instr->src, "a0"); /* exception value */
+                    fprintf(out, "  call __paninic_throw\n");
+                    break;
+
                 default:
                     fprintf(out, "  # Unimplemented IR instruction\n");
                     break;
