@@ -28,7 +28,8 @@ typedef enum {
     IR_ALLOCA,      /* x := alloca size */
     IR_TRY_BEGIN,   /* try_begin label_catch */
     IR_TRY_END,     /* try_end */
-    IR_THROW        /* throw x */
+    IR_THROW,       /* throw x */
+    IR_PHI          /* SSA: x := phi(x_pred0, x_pred1, ...) — optimizer-internal only */
 } IROpKind;
 
 /* Relational operators for IR_IF */
@@ -94,6 +95,16 @@ typedef struct IRInstr {
     IROperand if_right;
     IRRelop relop;
 
+    /* For IR_PHI (SSA construction — optimizer-internal, never reaches backend):
+     *   result holds the destination SSA name.
+     *   phi_args[i] is the SSA name of the incoming value from predecessor i.
+     *   phi_pred_bb[i] is the predecessor block id (parallel with phi_args).
+     *   phi_arity is the length of both arrays.
+     */
+    char  **phi_args;      /* owned strings */
+    int    *phi_pred_bb;   /* predecessor block IDs */
+    int     phi_arity;
+
     struct IRInstr *next;
 } IRInstr;
 
@@ -145,6 +156,9 @@ IRInstr* ir_make_alloca(char *dst, IROperand size, int line);
 IRInstr* ir_make_try_begin(char *catch_label, int line);
 IRInstr* ir_make_try_end(int line);
 IRInstr* ir_make_throw(IROperand val, int line);
+
+/* SSA phi function (optimizer-internal — never emitted to backend) */
+IRInstr* ir_make_phi(char *dst, int arity, int line);
 
 /* --- Operand helpers --- */
 IROperand ir_op_name(char *name);

@@ -236,6 +236,19 @@ IRInstr* ir_make_throw(IROperand val, int line) {
     return i;
 }
 
+IRInstr* ir_make_phi(char *dst, int arity, int line) {
+    IRInstr *i = calloc(1, sizeof(IRInstr));
+    i->kind = IR_PHI;
+    i->line = line;
+    i->result = dst ? strdup(dst) : NULL;
+    i->phi_arity = arity;
+    if (arity > 0) {
+        i->phi_args    = calloc(arity, sizeof(char*));
+        i->phi_pred_bb = calloc(arity, sizeof(int));
+    }
+    return i;
+}
+
 /* --- List management --- */
 void ir_append(IRInstr **head, IRInstr *instr) {
     if (!instr) return;
@@ -430,6 +443,16 @@ void ir_print_instr(IRInstr *instr) {
             print_operand(&instr->src);
             printf("\n");
             break;
+        case IR_PHI: {
+            printf("  %s := phi(", instr->result ? instr->result : "?");
+            for (int i = 0; i < instr->phi_arity; i++) {
+                printf("%s[bb%d]", instr->phi_args[i] ? instr->phi_args[i] : "?",
+                       instr->phi_pred_bb[i]);
+                if (i + 1 < instr->phi_arity) printf(", ");
+            }
+            printf(")\n");
+            break;
+        }
     }
 }
 
@@ -533,6 +556,19 @@ int ir_snprint_instr(char *buf, size_t size, IRInstr *instr) {
             n += snprintf(buf + n, size - n, "  throw ");
             n += snprint_operand(buf + n, size - n, &instr->src);
             break;
+        case IR_PHI: {
+            n += snprintf(buf + n, size - n, "  %s := phi(",
+                          instr->result ? instr->result : "?");
+            for (int i = 0; i < instr->phi_arity; i++) {
+                n += snprintf(buf + n, size - n, "%s[bb%d]",
+                              instr->phi_args[i] ? instr->phi_args[i] : "?",
+                              instr->phi_pred_bb[i]);
+                if (i + 1 < instr->phi_arity)
+                    n += snprintf(buf + n, size - n, ", ");
+            }
+            n += snprintf(buf + n, size - n, ")");
+            break;
+        }
     }
     return n;
 }
@@ -666,6 +702,16 @@ void ir_export_to_file(IRProgram *prog, const char *filename) {
                     else fprintf(f, "%s", i->src.name);
                     fprintf(f, "\n");
                     break;
+                case IR_PHI:
+                    fprintf(f, "  %s := phi(", i->result ? i->result : "?");
+                    for (int k = 0; k < i->phi_arity; k++) {
+                        fprintf(f, "%s[bb%d]",
+                                i->phi_args[k] ? i->phi_args[k] : "?",
+                                i->phi_pred_bb[k]);
+                        if (k + 1 < i->phi_arity) fprintf(f, ", ");
+                    }
+                    fprintf(f, ")\n");
+                    break;
             }
         }
         fprintf(f, "\n");
@@ -739,6 +785,13 @@ void ir_free_instr(IRInstr *instr) {
                 break;
             case IR_THROW:
                 if (instr->src.name) free(instr->src.name);
+                break;
+            case IR_PHI:
+                if (instr->result) free(instr->result);
+                for (int i = 0; i < instr->phi_arity; i++)
+                    if (instr->phi_args[i]) free(instr->phi_args[i]);
+                if (instr->phi_args)    free(instr->phi_args);
+                if (instr->phi_pred_bb) free(instr->phi_pred_bb);
                 break;
         }
         free(instr);

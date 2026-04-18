@@ -131,7 +131,8 @@ void free_cfg(CFG *cfg) {
         BasicBlock *next = bb->next;
         if (bb->preds) free(bb->preds);
         if (bb->succs) free(bb->succs);
-        if (bb->doms) free(bb->doms);
+        if (bb->doms)  free(bb->doms);
+        if (bb->df)    free(bb->df);
         free(bb);
         bb = next;
     }
@@ -984,6 +985,655 @@ void compute_dominators(CFG *cfg) {
             free(new_doms);
             bb = bb->next;
         }
+    }
+}
+
+/* --- Dominance Frontier Analysis (Phase 1 of SSA) --- */
+
+/*
+ * idom_of: Return the block-id of the immediate dominator of `b`.
+ * The immediate dominator is the closest strict dominator — i.e., the block
+ * that dominates `b` but does not dominate any other dominator of `b`.
+ * Returns -1 for the entry block (no immediate dominator).
+ *
+ * We use the existing doms[] bitset: idom(b) is the dominator d≠b such that
+ * no other dominator of b strictly dominates d.
+ */
+int idom_of(CFG *cfg, BasicBlock *b) {
+    if (!cfg || !b || b == cfg->entry) return -1;
+    int n = cfg->block_count;
+
+    /* Candidate: dominator d of b where d != b */
+    int idom_id = -1;
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        if (bb->id != b->id && b->doms[bb->id]) {
+            /* bb dominates b — check if it is dominated by current best */
+            if (idom_id == -1) {
+                idom_id = bb->id;
+            } else {
+                /* Keep whichever is strictly dominated by the other */
+                BasicBlock *cur_idom = cfg->blocks;
+                while (cur_idom && cur_idom->id != idom_id) cur_idom = cur_idom->next;
+                /* idom is the CLOSEST dominator. If candidate 'bb' is dominated by 
+                 * current best 'idom_id', then 'bb' is closer to 'b'. */
+                if (bb->doms[idom_id]) {
+                    idom_id = bb->id;
+                }
+            }
+        }
+        bb = bb->next;
+    }
+    (void)n;
+    return idom_id;
+}
+
+/*
+ * compute_dominance_frontiers: Populate bb->df for every block.
+ *
+ * Algorithm (Cooper/Harvey/Kennedy):
+ *   For each block b with >= 2 predecessors:
+ *     For each predecessor p of b:
+ *       runner = p
+ *       While runner != idom(b):
+ *         runner->df[b->id] = 1
+ *         runner = idom(runner)
+ *
+ * Must be called after compute_dominators().
+ */
+void compute_dominance_frontiers(CFG *cfg) {
+    if (!cfg || !cfg->entry) return;
+    int n = cfg->block_count;
+
+    /* Allocate / zero-init df bitsets */
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        if (bb->df) free(bb->df);
+        bb->df = calloc(n, sizeof(int));
+        bb = bb->next;
+    }
+
+    bb = cfg->blocks;
+    while (bb) {
+        if (bb->pred_count >= 2) {
+            int idom_id = idom_of(cfg, bb);
+            for (int p = 0; p < bb->pred_count; p++) {
+                BasicBlock *runner = bb->preds[p];
+                while (runner && runner->id != idom_id) {
+                    runner->df[bb->id] = 1;
+                    int next_idom = idom_of(cfg, runner);
+                    if (next_idom < 0) break;
+                    /* Find block with id == next_idom */
+                    BasicBlock *r2 = cfg->blocks;
+                    while (r2 && r2->id != next_idom) r2 = r2->next;
+                    runner = r2;
+                }
+            }
+        }
+        bb = bb->next;
+    }
+}
+
+/* ==========================================================================
+ * SSA Construction (Phase 2)
+ * ==========================================================================
+ *
+ * Two-step process:
+ *   1. insert_phi_functions  — Cytron iterated-DF phi placement
+ *   2. rename_variables      — dominator-tree DFS rename
+ * ==========================================================================
+ */
+
+/* --- Variable inventory helpers --- */
+
+typedef struct VarEntry {
+    char *name;
+    struct VarEntry *next;
+} VarEntry;
+
+/* Add `name` to list if not already present. Returns 1 if added. */
+static int varlist_add(VarEntry **list, const char *name) {
+    if (!name) return 0;
+    for (VarEntry *v = *list; v; v = v->next)
+        if (strcmp(v->name, name) == 0) return 0;
+    VarEntry *e = malloc(sizeof(VarEntry));
+    e->name = strdup(name);
+    e->next = *list;
+    *list = e;
+    return 1;
+}
+
+static void varlist_free(VarEntry *list) {
+    while (list) { VarEntry *n = list->next; free(list->name); free(list); list = n; }
+}
+
+/*
+ * collect_all_vars: Walk every instruction in the CFG and collect every
+ * variable name that appears as a *definition* (instr->result).
+ * We only SSA-rename these — not function names, labels, or constants.
+ */
+static VarEntry* collect_all_vars(CFG *cfg) {
+    VarEntry *vars = NULL;
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        IRInstr *ins = bb->instrs;
+        while (ins) {
+            if (ins->result)
+                varlist_add(&vars, ins->result);
+            if (ins == bb->last) break;
+            ins = ins->next;
+        }
+        bb = bb->next;
+    }
+    return vars;
+}
+
+/* --- Block list (simple int bitset worklist) --- */
+
+typedef struct { int *bits; int n; } Bitset;
+
+static Bitset bs_alloc(int n) {
+    Bitset b; b.n = n; b.bits = calloc(n, sizeof(int)); return b;
+}
+static void bs_free(Bitset b)       { free(b.bits); }
+static void bs_set(Bitset b, int i) { if (i >= 0 && i < b.n) b.bits[i] = 1; }
+static int  bs_test(Bitset b, int i){ return (i >= 0 && i < b.n) ? b.bits[i] : 0; }
+static void bs_clear_all(Bitset b)  { memset(b.bits, 0, b.n * sizeof(int)); }
+
+/* --- Step 1: Phi insertion (Cytron et al.) --- */
+
+/*
+ * For a given variable `var_name`, find every block that defines it
+ * (has an instruction with result == var_name), then propagate phi
+ * placements through the iterated dominance frontier.
+ */
+static void insert_phis_for_var(CFG *cfg, const char *var_name,
+                                 Bitset has_already, Bitset ever_on_wl) {
+    int n = cfg->block_count;
+    bs_clear_all(has_already);
+    bs_clear_all(ever_on_wl);
+
+    /* Worklist = all blocks that define var_name */
+    BasicBlock **worklist = malloc(n * sizeof(BasicBlock*));
+    int wl_top = 0;
+
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        IRInstr *ins = bb->instrs;
+        int defines = 0;
+        while (ins) {
+            if (ins->result && strcmp(ins->result, var_name) == 0) {
+                defines = 1; break;
+            }
+            if (ins == bb->last) break;
+            ins = ins->next;
+        }
+        if (defines) {
+            bs_set(ever_on_wl, bb->id);
+            worklist[wl_top++] = bb;
+        }
+        bb = bb->next;
+    }
+
+    while (wl_top > 0) {
+        BasicBlock *x = worklist[--wl_top];
+
+        /* For each block y in DF(x) */
+        for (int y_id = 0; y_id < n; y_id++) {
+            if (!x->df || !x->df[y_id]) continue;
+
+            /* Find block y */
+            BasicBlock *y = cfg->blocks;
+            while (y && y->id != y_id) y = y->next;
+            if (!y) continue;
+
+            if (!bs_test(has_already, y_id)) {
+                /* Insert phi for var_name at top of y (after IR_LABEL if present) */
+                IRInstr *phi = ir_make_phi((char *)var_name, y->pred_count, y->instrs ? y->instrs->line : 0);
+                for (int k = 0; k < y->pred_count; k++)
+                    phi->phi_pred_bb[k] = y->preds[k]->id;
+                /* phi_args slots remain NULL — filled by rename pass */
+
+                /* Insert after the leading IR_LABEL (if any) */
+                if (y->instrs && y->instrs->kind == IR_LABEL) {
+                    phi->next = y->instrs->next;
+                    y->instrs->next = phi;
+                    if (y->instrs == y->last) y->last = phi;
+                } else {
+                    phi->next = y->instrs;
+                    y->instrs = phi;
+                    if (!y->last) y->last = phi;
+                }
+
+                bs_set(has_already, y_id);
+
+                if (!bs_test(ever_on_wl, y_id)) {
+                    bs_set(ever_on_wl, y_id);
+                    worklist[wl_top++] = y;
+                }
+            }
+        }
+    }
+    free(worklist);
+}
+
+static void insert_phi_functions(CFG *cfg, VarEntry *vars) {
+    int n = cfg->block_count;
+    Bitset has_already = bs_alloc(n);
+    Bitset ever_on_wl  = bs_alloc(n);
+
+    for (VarEntry *v = vars; v; v = v->next)
+        insert_phis_for_var(cfg, v->name, has_already, ever_on_wl);
+
+    bs_free(has_already);
+    bs_free(ever_on_wl);
+}
+
+/* --- Step 2: Variable renaming (dominator-tree DFS) --- */
+
+/*
+ * Per-variable version stack.  Each entry is:
+ *   var_name -> stack of current SSA names (top = newest).
+ */
+typedef struct NameStack {
+    char  *orig;       /* original variable name */
+    char **stack;      /* stack of SSA names (strdup'd) */
+    int    sp;         /* stack pointer (0 = empty) */
+    int    cap;
+    int    counter;    /* next available version number */
+} NameStack;
+
+typedef struct RenameState {
+    NameStack *stacks;
+    int        nstacks;
+    int        cap;
+} RenameState;
+
+static NameStack* rs_find(RenameState *rs, const char *name) {
+    for (int i = 0; i < rs->nstacks; i++)
+        if (strcmp(rs->stacks[i].orig, name) == 0)
+            return &rs->stacks[i];
+    return NULL;
+}
+
+static NameStack* rs_get_or_create(RenameState *rs, const char *name) {
+    NameStack *s = rs_find(rs, name);
+    if (s) return s;
+    if (rs->nstacks == rs->cap) {
+        rs->cap = rs->cap ? rs->cap * 2 : 16;
+        rs->stacks = realloc(rs->stacks, rs->cap * sizeof(NameStack));
+    }
+    NameStack *ns = &rs->stacks[rs->nstacks++];
+    ns->orig    = strdup(name);
+    ns->stack   = calloc(64, sizeof(char*));
+    ns->sp      = 0;
+    ns->cap     = 64;
+    ns->counter = 0;
+    return ns;
+}
+
+/* Push a newly generated SSA name onto the stack; return it (caller does NOT free). */
+static char* rs_push_new(RenameState *rs, const char *orig_name) {
+    NameStack *s = rs_get_or_create(rs, orig_name);
+    if (s->sp == s->cap) {
+        s->cap *= 2;
+        s->stack = realloc(s->stack, s->cap * sizeof(char*));
+    }
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s.%d", orig_name, s->counter++);
+    s->stack[s->sp++] = strdup(buf);
+    return s->stack[s->sp - 1];
+}
+
+/* Peek at the top of the stack (most recent SSA name), or `orig_name` if empty. */
+static const char* rs_top(RenameState *rs, const char *orig_name) {
+    NameStack *s = rs_find(rs, orig_name);
+    if (!s || s->sp == 0) return orig_name;   /* no rename yet — use original */
+    return s->stack[s->sp - 1];
+}
+
+/* Pop `count` names from the stack. */
+static void rs_pop(RenameState *rs, const char *orig_name, int count) {
+    NameStack *s = rs_find(rs, orig_name);
+    if (!s) return;
+    while (count-- > 0 && s->sp > 0) {
+        free(s->stack[--s->sp]);
+    }
+}
+
+static void rs_free(RenameState *rs) {
+    for (int i = 0; i < rs->nstacks; i++) {
+        free(rs->stacks[i].orig);
+        for (int j = 0; j < rs->stacks[i].sp; j++)
+            free(rs->stacks[i].stack[j]);
+        free(rs->stacks[i].stack);
+    }
+    free(rs->stacks);
+}
+
+/*
+ * rename_operand: Replace a use operand's name with the current SSA top.
+ * Only renames if the name is a *tracked* variable (present in `vars`).
+ */
+static void rename_operand(IROperand *op, RenameState *rs, VarEntry *vars) {
+    if (!op || op->is_const || !op->name) return;
+    /* Only rename names we know about (skip function names / labels) */
+    VarEntry *v = vars;
+    while (v) {
+        if (strcmp(v->name, op->name) == 0) {
+            const char *ssa = rs_top(rs, op->name);
+            if (ssa != op->name) {  /* actually got a rename */
+                free(op->name);
+                op->name = strdup(ssa);
+            }
+            return;
+        }
+        v = v->next;
+    }
+}
+
+/*
+ * rename_block: The core dominator-tree DFS rename.
+ * `push_counts` tracks how many names each block pushes (for pop-on-exit).
+ */
+static void rename_block(BasicBlock *bb, CFG *cfg, RenameState *rs, VarEntry *vars) {
+    /* Track how many pushes this block makes per variable (for cleanup on exit) */
+    typedef struct { char *orig; int pushes; } PushRec;
+    PushRec *pushed = NULL;
+    int pushed_n = 0, pushed_cap = 0;
+
+    #define TRACK_PUSH(orig_name) do { \
+        int _found = 0; \
+        for (int _i = 0; _i < pushed_n; _i++) \
+            if (strcmp(pushed[_i].orig, (orig_name)) == 0) { pushed[_i].pushes++; _found = 1; break; } \
+        if (!_found) { \
+            if (pushed_n == pushed_cap) { pushed_cap = pushed_cap ? pushed_cap*2 : 8; \
+                pushed = realloc(pushed, pushed_cap * sizeof(PushRec)); } \
+            pushed[pushed_n].orig = strdup(orig_name); pushed[pushed_n].pushes = 1; pushed_n++; \
+        } \
+    } while(0)
+
+    IRInstr *ins = bb->instrs;
+    while (ins) {
+        if (ins->kind == IR_PHI) {
+            /* Definition: rename the result of this phi to a new SSA name */
+            if (ins->result) {
+                char *orig = strdup(ins->result);
+                const char *ssa_name = rs_push_new(rs, orig);
+                free(ins->result);
+                ins->result = strdup(ssa_name);
+                TRACK_PUSH(orig);
+                free(orig);
+            }
+        } else {
+            /* --- Rename uses first --- */
+            switch (ins->kind) {
+                case IR_ASSIGN:
+                    rename_operand(&ins->src, rs, vars);
+                    break;
+                case IR_BINOP:
+                    rename_operand(&ins->left, rs, vars);
+                    rename_operand(&ins->right, rs, vars);
+                    break;
+                case IR_UNOP:
+                    rename_operand(&ins->unop_src, rs, vars);
+                    break;
+                case IR_PARAM:
+                    rename_operand(&ins->src, rs, vars);
+                    break;
+                case IR_IF:
+                    rename_operand(&ins->if_left, rs, vars);
+                    rename_operand(&ins->if_right, rs, vars);
+                    break;
+                case IR_RETURN:
+                    rename_operand(&ins->src, rs, vars);
+                    break;
+                case IR_LOAD:
+                    rename_operand(&ins->base, rs, vars);
+                    rename_operand(&ins->index, rs, vars);
+                    break;
+                case IR_STORE:
+                    rename_operand(&ins->base, rs, vars);
+                    rename_operand(&ins->index, rs, vars);
+                    rename_operand(&ins->store_val, rs, vars);
+                    break;
+                case IR_ALLOCA:
+                    rename_operand(&ins->src, rs, vars);
+                    break;
+                case IR_CALL_INDIRECT:
+                    rename_operand(&ins->base, rs, vars);
+                    break;
+                default:
+                    break;
+            }
+
+            /* --- Rename definition (push new SSA name) --- */
+            if (ins->result) {
+                /* Check the result name is a tracked variable */
+                VarEntry *v = vars;
+                while (v) {
+                    if (strcmp(v->name, ins->result) == 0) {
+                        char *orig = strdup(ins->result);
+                        const char *ssa_name = rs_push_new(rs, orig);
+                        free(ins->result);
+                        ins->result = strdup(ssa_name);
+                        TRACK_PUSH(orig);
+                        free(orig);
+                        break;
+                    }
+                    v = v->next;
+                }
+            }
+        }
+
+        if (ins == bb->last) break;
+        ins = ins->next;
+    }
+
+    /* Fill in phi arguments in successor blocks */
+    for (int si = 0; si < bb->succ_count; si++) {
+        BasicBlock *succ = bb->succs[si];
+        IRInstr *phi = succ->instrs;
+        /* Skip initial label if present */
+        if (phi && phi->kind == IR_LABEL) phi = phi->next;
+        while (phi && phi->kind == IR_PHI) {
+            /* Find which slot in phi corresponds to `bb` */
+            for (int k = 0; k < phi->phi_arity; k++) {
+                if (phi->phi_pred_bb[k] == bb->id) {
+                    /* phi->result holds the *original* var name at insert time
+                     * but after we renamed the definition in `bb`, the top of
+                     * stack for the original name is what flows into the phi. */
+                    /* We need the original variable name for this phi.
+                     * If the successor block was already visited (e.g. backedge),
+                     * phi->result is already renamed (e.g. sum$7.1). We must strip
+                     * the suffix to find the base variable name. */
+                    char orig_var[128];
+                    strncpy(orig_var, phi->result, sizeof(orig_var) - 1);
+                    orig_var[sizeof(orig_var) - 1] = '\0';
+                    char *dot = strchr(orig_var, '.');
+                    if (dot) *dot = '\0';
+
+                    const char *top = rs_top(rs, orig_var);
+                    if (phi->phi_args[k]) free(phi->phi_args[k]);
+                    phi->phi_args[k] = strdup(top);
+                    break;
+                }
+            }
+            if (phi == succ->last) break;
+            phi = phi->next;
+        }
+    }
+
+    /* Recurse into children in the dominator tree */
+    BasicBlock *child = cfg->blocks;
+    while (child) {
+        if (child != bb && child != cfg->entry &&
+            idom_of(cfg, child) == bb->id) {
+            rename_block(child, cfg, rs, vars);
+        }
+        child = child->next;
+    }
+
+    /* Pop everything this block pushed */
+    for (int i = 0; i < pushed_n; i++) {
+        rs_pop(rs, pushed[i].orig, pushed[i].pushes);
+        free(pushed[i].orig);
+    }
+    free(pushed);
+
+    #undef TRACK_PUSH
+}
+
+static void rename_variables(CFG *cfg, VarEntry *vars) {
+    RenameState rs = {0};
+    rename_block(cfg->entry, cfg, &rs, vars);
+    rs_free(&rs);
+}
+
+/* --- Public SSA API --- */
+
+void ssa_construct(CFG *cfg) {
+    if (!cfg || !cfg->entry) return;
+
+    /* Dominators must already be computed by the caller */
+    compute_dominance_frontiers(cfg);
+
+    VarEntry *vars = collect_all_vars(cfg);
+    if (!vars) return;
+
+    insert_phi_functions(cfg, vars);
+    rename_variables(cfg, vars);
+
+    varlist_free(vars);
+}
+
+/* ==========================================================================
+ * SSA Deconstruction — Out-of-SSA (Phase 3)
+ * ==========================================================================
+ *
+ * Replace each phi   `x := phi(x_i from pred_i, ...)`   with
+ * copy instructions  `x := x_i`   inserted at the end of each pred_i,
+ * just before its block terminator (IR_GOTO / IR_IF / IR_RETURN).
+ *
+ * Then remove all IR_PHI instructions from every block.
+ * ==========================================================================
+ */
+
+/*
+ * insert_copy_before_terminator: Insert `IR_ASSIGN dst := src_name` at the
+ * end of `pred_bb`, immediately before its terminator instruction.
+ */
+static void insert_copy_before_terminator(BasicBlock *pred_bb,
+                                           const char *dst,
+                                           const char *src_name) {
+    IROperand src_op;
+    src_op.name      = strdup(src_name);
+    src_op.is_const  = 0;
+    src_op.const_val = 0;
+
+    IRInstr *copy = ir_make_assign((char *)dst, src_op, pred_bb->last ? pred_bb->last->line : 0);
+    free(src_op.name);  /* ir_make_assign strdup's it */
+
+    if (!pred_bb->instrs) {
+        /* Empty block — just set */
+        pred_bb->instrs = copy;
+        pred_bb->last   = copy;
+        return;
+    }
+
+    IRInstr *term = pred_bb->last;
+    if (!term) {
+        /* No terminator — append */
+        IRInstr *p = pred_bb->instrs;
+        while (p->next) p = p->next;
+        p->next       = copy;
+        pred_bb->last = copy;
+        return;
+    }
+
+    int is_term = (term->kind == IR_GOTO || term->kind == IR_IF ||
+                   term->kind == IR_RETURN);
+    if (!is_term) {
+        /* Append after last */
+        term->next    = copy;
+        pred_bb->last = copy;
+        return;
+    }
+
+    /* Insert before the terminator */
+    if (pred_bb->instrs == term) {
+        /* Terminator is the only instruction */
+        pred_bb->instrs = copy;
+        copy->next      = term;
+        /* last stays as term */
+        return;
+    }
+
+    /* Walk to find the instruction before term */
+    IRInstr *prev = pred_bb->instrs;
+    while (prev->next && prev->next != term) prev = prev->next;
+    prev->next = copy;
+    copy->next = term;
+}
+
+void ssa_destruct(CFG *cfg) {
+    if (!cfg) return;
+
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        /* Collect all phi instructions in this block */
+        IRInstr *ins = bb->instrs;
+        /* Skip optional leading label */
+        IRInstr *scan_start = ins;
+        if (scan_start && scan_start->kind == IR_LABEL)
+            scan_start = scan_start->next;
+
+        while (scan_start && scan_start->kind == IR_PHI) {
+            IRInstr *phi = scan_start;
+            scan_start = scan_start->next;
+
+            /* For each predecessor, insert a copy */
+            for (int k = 0; k < phi->phi_arity; k++) {
+                /* Find predecessor block */
+                BasicBlock *pred = NULL;
+                for (int p = 0; p < bb->pred_count; p++) {
+                    if (bb->preds[p]->id == phi->phi_pred_bb[k]) {
+                        pred = bb->preds[p];
+                        break;
+                    }
+                }
+                if (!pred) continue;
+                if (!phi->phi_args[k]) continue;   /* undef — skip */
+
+                insert_copy_before_terminator(pred, phi->result, phi->phi_args[k]);
+            }
+        }
+
+        /* Remove all IR_PHI nodes from bb->instrs */
+        IRInstr **cur = &bb->instrs;
+        while (*cur) {
+            IRInstr *candidate = *cur;
+            /* Only remove phis that are NOT the leading label */
+            if (candidate->kind == IR_PHI) {
+                *cur = candidate->next;
+                candidate->next = NULL;
+                ir_free_instr(candidate);
+                continue;
+            }
+            if (candidate == bb->last) break;
+            cur = &((*cur)->next);
+        }
+
+        /* Fix bb->last: walk to real end */
+        if (bb->instrs) {
+            IRInstr *p = bb->instrs;
+            while (p->next) p = p->next;
+            bb->last = p;
+        } else {
+            bb->last = NULL;
+        }
+
+        bb = bb->next;
     }
 }
 
@@ -2000,6 +2650,17 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
             mark_reachable_and_cleanup(cfg);
 
             if (level >= OPT_O2) {
+                /* --- SSA round-trip (Phase 1-3) ---
+                 * Dominators must be computed before constructing SSA because
+                 * both dominance frontiers and dominator-tree renaming rely on them.
+                 * After all SSA-based passes (currently none), destruct back to
+                 * conventional 3-address IR before the loop passes run.
+                 */
+                compute_dominators(cfg);
+                ssa_construct(cfg);
+                /* <-- Future SSA-based passes go here (SCCP, GVN, SSA-DCE, ...) */
+                ssa_destruct(cfg);
+
                 optimize_loops(cfg);
                 unroll_loops(cfg);
             }

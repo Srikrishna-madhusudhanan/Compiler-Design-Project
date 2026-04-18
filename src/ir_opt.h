@@ -37,7 +37,10 @@ typedef struct BasicBlock {
     int def_count;
     
     /* Dominators */
-    int *doms; /* bitset of block IDs */
+    int *doms; /* bitset of block IDs: doms[i]=1 means block i dominates this block */
+
+    /* Dominance Frontier (SSA construction) */
+    int *df;   /* bitset of block IDs: df[i]=1 means block i is in this block's DF */
 
     struct BasicBlock *next; /* For linear list of blocks in function */
 } BasicBlock;
@@ -62,9 +65,18 @@ void export_cfg_to_json(CFG *cfg, const char *path);
 /* Liveness analysis (also used by register allocator) */
 void compute_liveness(CFG *cfg);
 
+/* Dominator analysis */
+void compute_dominators(CFG *cfg);
+void compute_dominance_frontiers(CFG *cfg); /* requires compute_dominators first */
+int  idom_of(CFG *cfg, BasicBlock *b);      /* returns id of immediate dominator, -1 for entry */
+
 // /* Dead code / unreachable block elimination */
 // void eliminate_dead_code(CFG *cfg);
 
 void eliminate_unreachable_blocks(CFG *cfg);
+
+/* SSA Construction & Deconstruction (optimizer-internal; always paired) */
+void ssa_construct(CFG *cfg); /* convert to SSA: insert phis + rename variables */
+void ssa_destruct(CFG *cfg);  /* out-of-SSA: replace phis with copy instructions */
 
 #endif /* IR_OPT_H */
