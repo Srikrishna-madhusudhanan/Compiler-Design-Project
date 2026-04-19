@@ -18,6 +18,7 @@ toy_linker.md
 # CFG and Interference Graphs
 *_cfg.json
 *_interference.json
+*_sched.json
 *_cfg.dot
 *_interference.dot
 
