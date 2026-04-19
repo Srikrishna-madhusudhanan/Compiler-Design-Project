@@ -532,7 +532,7 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
                 IRInstr *store_instr = ir_make_assign(strdup(sname), ir_op_name(strdup(t_def)), instr->line);
                 store_instr->next = next;
                 instr->next = store_instr;
-                next = store_instr; /* will be processed next iteration */
+                /* DO NOT do `next = store_instr`. That causes an infinite loop by re-evaluating the spill! */
 
                 free(t_def);
                 rewrote = 1;
@@ -540,6 +540,9 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
         }
 
         prev = instr;
+        /* Advance prev past any store_instrs we inserted so it correctly borders next */
+        while (prev && prev->next != next) prev = prev->next;
+        
         instr = next;
     }
 

@@ -1,4 +1,5 @@
 void foo() {
+    printf("Hello\n");
 }
 
 int main() {

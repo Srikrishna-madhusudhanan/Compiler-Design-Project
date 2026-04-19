@@ -1609,29 +1609,27 @@ void ssa_destruct(CFG *cfg) {
             }
         }
 
-        /* Remove all IR_PHI nodes from bb->instrs */
+        /* Remove all IR_PHI nodes from bb->instrs and update bb->last safely */
         IRInstr **cur = &bb->instrs;
+        IRInstr *new_last = NULL;
         while (*cur) {
             IRInstr *candidate = *cur;
+            int is_last = (candidate == bb->last);
+            
             /* Only remove phis that are NOT the leading label */
             if (candidate->kind == IR_PHI) {
                 *cur = candidate->next;
                 candidate->next = NULL;
                 ir_free_instr(candidate);
+                if (is_last) break; /* Block ended with a phi and we removed it */
                 continue;
             }
-            if (candidate == bb->last) break;
+            
+            new_last = candidate;
+            if (is_last) break;
             cur = &((*cur)->next);
         }
-
-        /* Fix bb->last: walk to real end */
-        if (bb->instrs) {
-            IRInstr *p = bb->instrs;
-            while (p->next) p = p->next;
-            bb->last = p;
-        } else {
-            bb->last = NULL;
-        }
+        bb->last = new_last;
 
         bb = bb->next;
     }
