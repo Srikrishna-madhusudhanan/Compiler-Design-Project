@@ -54,6 +54,11 @@ $(BUILD_DIR)/lex.yy.o: $(BUILD_DIR)/lex.yy.c
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+AS_RISCV = riscv64-linux-gnu-as
+$(BUILD_DIR)/%_rv.o: $(SRC_DIR)/%.s
+	$(AS_RISCV) -march=rv64gc -mabi=lp64d -o $@ $<
+
+
 clean:
 	rm -rf $(BUILD_DIR) ast.dot ir.txt ir_opt.txt output.s compiler_metrics.txt
 	$(MAKE) -C tools/rvas clean

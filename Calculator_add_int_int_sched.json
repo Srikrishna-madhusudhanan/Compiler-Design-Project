@@ -1,0 +1,15 @@
+{
+  "func_name": "Calculator_add_int_int",
+  "blocks": [
+    {
+      "id": 1,
+      "nodes": [
+        {"id": 0, "label": "  t0.0 := x$9 + y$10", "priority": 2},
+        {"id": 1, "label": "  return t0.0", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 1}
+      ]
+    }
+  ]
+}

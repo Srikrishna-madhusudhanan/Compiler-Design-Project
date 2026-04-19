@@ -2573,7 +2573,250 @@ static int build_body_block_list(CFG *cfg, int *loop_blocks, BasicBlock *header,
     return n;
 }
 
+
+/* --- Induction Variable Elimination (IVE) --- */
+
+typedef struct {
+    char *name;
+    char *base_iv;
+    int multiplier;
+    int offset;
+    int is_basic;
+    int delta;
+} InductionVar;
+
+static int iv_name_match(const char *name1, const char *name2) {
+    if (!name1 || !name2) return 0;
+    const char *p1 = strchr(name1, '.');
+    const char *p2 = strchr(name2, '.');
+    int len1 = p1 ? (int)(p1 - name1) : (int)strlen(name1);
+    int len2 = p2 ? (int)(p2 - name2) : (int)strlen(name2);
+    if (len1 != len2) return 0;
+    return strncmp(name1, name2, len1) == 0;
+}
+
+static InductionVar* find_iv(InductionVar *ivs, int count, const char *name) {
+    if (!name) return NULL;
+    for (int i = 0; i < count; i++) {
+        if (iv_name_match(ivs[i].name, name)) return &ivs[i];
+    }
+    return NULL;
+}
+
+
+static void induction_variable_elimination(CFG *cfg) {
+    if (!cfg) return;
+    compute_dominators(cfg);
+
+    BasicBlock *b = cfg->blocks;
+    while (b) {
+        for (int j = 0; j < b->succ_count; j++) {
+            BasicBlock *h = b->succs[j];
+            if (!b->doms[h->id]) continue; /* only back-edges: h dominates b */
+
+            int *loop_blocks = calloc(cfg->block_count + 1, sizeof(int));
+            if (!loop_blocks) continue;
+
+            if (!compute_natural_loop(h, b, loop_blocks, cfg)) {
+                free(loop_blocks);
+                continue;
+            }
+
+            BasicBlock *preheader = find_preheader(h, loop_blocks);
+            if (!preheader) {
+                free(loop_blocks);
+                continue;
+            }
+
+            /* Step 1: Detect Basic Induction Variables (BIVs) */
+            InductionVar ivs[128];
+            int iv_count = 0;
+
+            BasicBlock *lb = cfg->blocks;
+            while (lb) {
+                if (loop_blocks[lb->id]) {
+                    IRInstr *ins = lb->instrs;
+                    while (ins) {
+                        int delta = 0;
+                        int matched = 0;
+                        char *ivar_name = NULL;
+
+                        if (ins->kind == IR_BINOP && ins->result && ins->left.name &&
+                            iv_name_match(ins->result, ins->left.name) && ins->right.is_const &&
+                            (ins->binop == '+' || ins->binop == '-')) {
+                            matched = 1;
+                            delta = (ins->binop == '+') ? ins->right.const_val : -ins->right.const_val;
+                            ivar_name = ins->result;
+                        }
+                        /* Pattern: tmp = i + 1; i = tmp */
+                        else if (ins->kind == IR_BINOP && ins->result && ins->left.name && ins->right.is_const &&
+                                 (ins->binop == '+' || ins->binop == '-')) {
+                            IRInstr *nx = ins->next;
+                            if (nx && nx->kind == IR_ASSIGN && !nx->src.is_const && nx->src.name &&
+                                strcmp(nx->src.name, ins->result) == 0 && iv_name_match(nx->result, ins->left.name)) {
+                                matched = 1;
+                                delta = (ins->binop == '+') ? ins->right.const_val : -ins->right.const_val;
+                                ivar_name = nx->result;
+                            }
+                        }
+
+                        if (matched && iv_count < 128) {
+                            ivs[iv_count].name      = strdup(ivar_name);
+                            ivs[iv_count].base_iv   = strdup(ivar_name);
+                            ivs[iv_count].multiplier = 1;
+                            ivs[iv_count].offset    = 0;
+                            ivs[iv_count].is_basic  = 1;
+                            ivs[iv_count].delta     = delta;
+                            iv_count++;
+                        }
+                        if (ins == lb->last) break;
+                        ins = ins->next;
+                    }
+                }
+                lb = lb->next;
+            }
+
+            /* Step 2: Detect Derived Induction Variables (DIVs) */
+            lb = cfg->blocks;
+            while (lb) {
+                if (loop_blocks[lb->id]) {
+                    IRInstr *ins = lb->instrs;
+                    while (ins) {
+                        if (ins->kind == IR_BINOP && ins->result) {
+                            InductionVar *base = NULL;
+                            int mult = 1, off = 0;
+
+                            if (ins->binop == '*') {
+                                base = find_iv(ivs, iv_count, ins->left.name);
+                                if (base && ins->right.is_const) {
+                                    mult = ins->right.const_val;
+                                } else if (ins->right.name && (base = find_iv(ivs, iv_count, ins->right.name)) && ins->left.is_const) {
+                                    mult = ins->left.const_val;
+                                }
+                                if (base && iv_count < 128) {
+                                    ivs[iv_count].name       = strdup(ins->result);
+                                    ivs[iv_count].base_iv    = strdup(base->base_iv);
+                                    ivs[iv_count].multiplier = base->multiplier * mult;
+                                    ivs[iv_count].offset     = base->offset * mult;
+                                    ivs[iv_count].is_basic   = 0;
+                                    ivs[iv_count].delta      = base->delta * mult;
+                                    iv_count++;
+                                }
+                            } else if (ins->binop == '+') {
+                                base = find_iv(ivs, iv_count, ins->left.name);
+                                if (base && ins->right.is_const) {
+                                    off = ins->right.const_val;
+                                } else if (ins->right.name && (base = find_iv(ivs, iv_count, ins->right.name)) && ins->left.is_const) {
+                                    off = ins->left.const_val;
+                                }
+                                if (base && iv_count < 128) {
+                                    ivs[iv_count].name       = strdup(ins->result);
+                                    ivs[iv_count].base_iv    = strdup(base->base_iv);
+                                    ivs[iv_count].multiplier = base->multiplier;
+                                    ivs[iv_count].offset     = base->offset + off;
+                                    ivs[iv_count].is_basic   = 0;
+                                    ivs[iv_count].delta      = base->delta;
+                                    iv_count++;
+                                }
+                            }
+                        }
+                        if (ins == lb->last) break;
+                        ins = ins->next;
+                    }
+                }
+                lb = lb->next;
+            }
+
+            /* Step 3: Strength Reduction */
+            for (int k = 0; k < iv_count; k++) {
+                if (ivs[k].is_basic) continue;
+
+                int init = 0;
+                if (!get_initial_value_from_block(preheader, ivs[k].base_iv, &init)) continue;
+
+                char *j_new = ir_new_temp();
+                IROperand init_op; init_op.is_const = 1; init_op.name = NULL;
+                init_op.const_val = (long)ivs[k].multiplier * init + ivs[k].offset;
+                IRInstr *init_ins = ir_make_assign(strdup(j_new), init_op, h->instrs->line);
+
+                /* Append init_ins to preheader before any branch */
+                IRInstr *pcur = preheader->instrs;
+                while (pcur && pcur->next) {
+                    if (pcur->next->kind == IR_GOTO || pcur->next->kind == IR_IF || pcur->next->kind == IR_RETURN) break;
+                    pcur = pcur->next;
+                }
+                if (pcur) {
+                    init_ins->next = pcur->next;
+                    pcur->next = init_ins;
+                    if (pcur == preheader->last) preheader->last = init_ins;
+                }
+
+                /* Insert update after each BIV update inside the loop */
+                lb = cfg->blocks;
+                while (lb) {
+                    if (loop_blocks[lb->id]) {
+                        IRInstr *ins = lb->instrs;
+                        while (ins) {
+                            if (ins->result && iv_name_match(ins->result, ivs[k].base_iv)) {
+                                IROperand j_op;     j_op.is_const = 0; j_op.name = strdup(j_new); j_op.const_val = 0;
+                                IROperand delta_op; delta_op.is_const = 1; delta_op.const_val = ivs[k].delta; delta_op.name = NULL;
+                                IRInstr *upd = ir_make_binop(strdup(j_new), j_op, delta_op, '+', ins->line);
+                                upd->next = ins->next;
+                                ins->next = upd;
+                                if (ins == lb->last) lb->last = upd;
+                            }
+                            if (ins == lb->last) break;
+                            ins = ins->next;
+                        }
+                    }
+                    lb = lb->next;
+                }
+
+                /* Replace DIV definitions/uses with j_new */
+                lb = cfg->blocks;
+                while (lb) {
+                    if (loop_blocks[lb->id]) {
+                        IRInstr *ins = lb->instrs;
+                        while (ins) {
+                            if (ins->result && strcmp(ins->result, ivs[k].name) == 0) {
+                                IROperand j_op; j_op.is_const = 0; j_op.name = strdup(j_new); j_op.const_val = 0;
+                                convert_to_assign(ins, j_op);
+                            } else {
+                                IROperand *ops[5] = {NULL}; int nops = 0;
+                                if (ins->kind == IR_ASSIGN)  { ops[0] = &ins->src; nops = 1; }
+                                else if (ins->kind == IR_BINOP) { ops[0] = &ins->left; ops[1] = &ins->right; nops = 2; }
+                                else if (ins->kind == IR_IF) { ops[0] = &ins->if_left; ops[1] = &ins->if_right; nops = 2; }
+                                else if (ins->kind == IR_RETURN) { ops[0] = &ins->src; nops = 1; }
+                                for (int m = 0; m < nops; m++) {
+                                    if (ops[m] && !ops[m]->is_const && ops[m]->name &&
+                                        strcmp(ops[m]->name, ivs[k].name) == 0) {
+                                        free(ops[m]->name);
+                                        ops[m]->name = strdup(j_new);
+                                    }
+                                }
+                            }
+                            if (ins == lb->last) break;
+                            ins = ins->next;
+                        }
+                    }
+                    lb = lb->next;
+                }
+
+                free(j_new);
+            }
+
+            for (int k = 0; k < iv_count; k++) {
+                free(ivs[k].name);
+                free(ivs[k].base_iv);
+            }
+            free(loop_blocks);
+        }
+        b = b->next;
+    }
+}
+
 void unroll_loops(CFG *cfg) {
+
     if (!cfg) return;
     compute_dominators(cfg);
 
@@ -2881,8 +3124,10 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
                 /* <-- Future SSA-based passes go here (SCCP, GVN, SSA-DCE, ...) */
                 ssa_destruct(cfg);
 
+                induction_variable_elimination(cfg);
                 optimize_loops(cfg);
                 unroll_loops(cfg);
+
             }
 
             f->instrs = flatten_cfg(cfg);

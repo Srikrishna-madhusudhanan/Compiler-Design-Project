@@ -93,63 +93,50 @@ $RISCVC "${COMPILER_FLAGS[@]}" -static -o "$TMP_EXE" output.s src/exception_runt
 # --- EXECUTION WITH REAL BENCHMARK METRICS ---
 echo "--> Executing in QEMU..."
 
-# FIX 6: Use $'...' quoting so \n is an actual newline character.
-#        With a plain double-quoted string, GNU time receives the literal
-#        two-character sequence \n and writes everything on one line,
-#        causing every subsequent "grep ^real / ^user / ^sys / ^mem" to
-#        find nothing and leave the variables empty.
-TIME_FORMAT=$'real %e\nuser %U\nsys %S\nmem %M'
-
+QEMU_EXIT=0
 if [ -n "$INPUT" ]; then
-    printf '%s' "$INPUT" | /usr/bin/time -f "$TIME_FORMAT" -o "$TIME_OUTPUT" "$QEMU" "$TMP_EXE"
+    printf '%s' "$INPUT" | /usr/bin/time -v -o "$TIME_OUTPUT" "$QEMU" "$TMP_EXE" || QEMU_EXIT=$?
 else
-    /usr/bin/time -f "$TIME_FORMAT" -o "$TIME_OUTPUT" "$QEMU" "$TMP_EXE"
+    /usr/bin/time -v -o "$TIME_OUTPUT" "$QEMU" "$TMP_EXE" || QEMU_EXIT=$?
 fi
 
 # --- METRICS EXTRACTION ---
 if [ "$SHOW_METRICS" = true ]; then
     if [ -s "$TIME_OUTPUT" ]; then
 
-        EXEC_TIME=$(grep "^real" "$TIME_OUTPUT" | awk '{print $2}')
-        USER_TIME=$(grep "^user" "$TIME_OUTPUT" | awk '{print $2}')
-        SYS_TIME=$(grep  "^sys"  "$TIME_OUTPUT" | awk '{print $2}')
-        PEAK_MEM=$(grep  "^mem"  "$TIME_OUTPUT" | awk '{print $2}')
+        # Convert elapsed time (h:mm:ss.ss or m:ss.ss or ss.ss) to milliseconds
+        EXEC_TIME_MS=$(grep "Elapsed (wall clock) time" "$TIME_OUTPUT" | awk -F': ' '{print $2}' | awk -F: '{
+            if(NF==3) print ($1*3600+$2*60+$3)*1000;
+            else if(NF==2) print ($1*60+$2)*1000;
+            else print $1*1000;
+        }')
+        # Extract peak RSS in kbytes
+        PEAK_MEM=$(grep "Maximum resident set size" "$TIME_OUTPUT" | awk '{print $NF}')
 
         echo ""
         echo "===== EXECUTION METRICS ====="
-        echo "Wall clock time : $EXEC_TIME sec"
-        echo "User CPU time   : $USER_TIME sec"
-        echo "Sys CPU time    : $SYS_TIME sec"
-        echo "Peak memory     : $PEAK_MEM KB"
+        echo "Elapsed time    : ${EXEC_TIME_MS:-0} ms"
+        echo "Peak memory     : ${PEAK_MEM:-0} KB"
         echo "============================="
         echo ""
 
-        if [ -f "compiler_metrics.txt" ]; then
-            # FIX 7: Safer in-place edit using a single atomic temp-file swap.
-            #        The old two-step grep-v pipeline wrote to compiler_metrics.tmp
-            #        then back to compiler_metrics.txt in two separate commands;
-            #        a crash between them left a truncated or missing metrics file.
-            #        Using a single sed -i (or awk to a tmp then mv) is atomic.
-            TMP_METRICS="$(mktemp /tmp/compiler_metrics_XXXXXX.txt)"
-            grep -v -e "^Execution time" -e "^Peak memory" compiler_metrics.txt \
-                > "$TMP_METRICS" || true
-            mv "$TMP_METRICS" compiler_metrics.txt
+        # Write metrics into compiler_metrics.txt (create if missing)
+        if [ ! -f "compiler_metrics.txt" ]; then
+            touch compiler_metrics.txt
+        fi
 
-            # Multiply by 1,000,000,000 for nanoseconds. 
-            # We use bc for floating point math if available, or just append zeros if it's a simple float.
-            # Simpler: use awk to do the multiplication.
-            EXEC_TIME_NS=$(echo "$EXEC_TIME" | awk '{print int($1 * 1000000000)}')
+        # Strip old exec/mem lines, then append fresh ones
+        TMP_METRICS="$(mktemp /tmp/compiler_metrics_XXXXXX.txt)"
+        grep -v -e "^Execution time" -e "^Peak memory" compiler_metrics.txt > "$TMP_METRICS" || true
+        mv "$TMP_METRICS" compiler_metrics.txt
 
-            cat >> compiler_metrics.txt <<EOF
-Execution time (wall):               $EXEC_TIME_NS ns
-Execution time (user):               $USER_TIME s
-Execution time (sys):                $SYS_TIME s
-Peak memory usage:                   $PEAK_MEM KB
+        cat >> compiler_metrics.txt <<EOF
+Execution time (wall):               ${EXEC_TIME_MS:-0} ms
+Peak memory usage:                   ${PEAK_MEM:-0} KB
 ==========================
 EOF
-        fi
     else
-        echo "--> Warning: Metrics output file is empty."
+        echo "---> Warning: Metrics output file is empty (QEMU may have failed with code $QEMU_EXIT)."
     fi
 fi
 

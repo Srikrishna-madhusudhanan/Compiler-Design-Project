@@ -454,83 +454,141 @@ void ir_schedule_export_json(IRFunc *f, const char *path) {
     fprintf(fp, "  \"func_name\": \"%s\",\n", f->name);
     fprintf(fp, "  \"blocks\": [\n");
 
-    IRInstr *curr = f->instrs;
-    IRInstr *first_of_block = curr;
-    int bcount = 0;
-    int block_id = 1;
+    /*
+     * We group instructions into semantic basic blocks:
+     *   - A block starts right after a label (or at function entry)
+     *   - A block ends at a control-flow barrier (IF, GOTO, RETURN, CALL etc.)
+     *   - Labels themselves are separators, not emitted as nodes
+     *
+     * This ensures each block has multiple real instructions, not just 1.
+     */
 
-    while (curr) {
-        bcount++;
-        int ends_block = is_barrier(curr) || (curr->next && curr->next->kind == IR_LABEL);
-        
-        if (ends_block || !curr->next) {
-            /* Analyze block [first_of_block ... curr] */
-            IRInstr *next_block = curr->next;
-            curr->next = NULL;
+    /* First pass: collect all instruction pointers (skip labels) */
+    typedef struct { IRInstr **instrs; int count; int cap; } Block;
+    Block blocks[256];
+    int block_count = 0;
 
-            fprintf(fp, "    {\n");
-            fprintf(fp, "      \"id\": %d,\n", block_id++);
-            
-            /* Build DAG temporarily to export */
-            int count = bcount;
-            SchedNode *nodes = calloc(count, sizeof(SchedNode));
-            IRInstr *it = first_of_block;
-            for (int i = 0; i < count; i++) {
-                nodes[i].instr = it;
-                nodes[i].index = i;
-                nodes[i].is_barrier = is_barrier(it);
-                nodes[i].is_load = (it->kind == IR_LOAD);
-                nodes[i].is_store = (it->kind == IR_STORE);
-                nodes[i].is_call = (it->kind == IR_CALL || it->kind == IR_CALL_INDIRECT);
-                it = it->next;
+    blocks[0].instrs = NULL;
+    blocks[0].count  = 0;
+    blocks[0].cap    = 0;
+    block_count = 1;
+
+    for (IRInstr *cur = f->instrs; cur; cur = cur->next) {
+        if (cur->kind == IR_LABEL) {
+            /* Start a new block after this label */
+            if (blocks[block_count - 1].count > 0 && block_count < 255) {
+                blocks[block_count].instrs = NULL;
+                blocks[block_count].count  = 0;
+                blocks[block_count].cap    = 0;
+                block_count++;
             }
-            build_dag(nodes, count);
-            compute_priorities(nodes, count);
+            continue; /* don't add labels as nodes */
+        }
 
-            /* Nodes */
-            fprintf(fp, "      \"nodes\": [\n");
-            for (int i = 0; i < count; i++) {
-                char buf[128];
-                ir_snprint_instr(buf, sizeof(buf), nodes[i].instr);
-                fprintf(fp, "        {\"id\": %d, \"label\": \"%s\", \"priority\": %d}%s\n",
-                        i, buf, nodes[i].est_completion_time, (i == count - 1) ? "" : ",");
+        Block *cb = &blocks[block_count - 1];
+        if (cb->count >= cb->cap) {
+            cb->cap = cb->cap ? cb->cap * 2 : 8;
+            cb->instrs = realloc(cb->instrs, cb->cap * sizeof(IRInstr *));
+        }
+        cb->instrs[cb->count++] = cur;
+
+        /* End this block at control-flow but continue to next */
+        if (is_barrier(cur)) {
+            if (block_count < 255) {
+                blocks[block_count].instrs = NULL;
+                blocks[block_count].count  = 0;
+                blocks[block_count].cap    = 0;
+                block_count++;
             }
-            fprintf(fp, "      ],\n");
-
-            /* Edges */
-            fprintf(fp, "      \"edges\": [\n");
-            int first_edge = 1;
-            for (int i = 0; i < count; i++) {
-                for (SchedEdge *e = nodes[i].succs; e; e = e->next) {
-                    if (!first_edge) fprintf(fp, ",\n");
-                    fprintf(fp, "        {\"from\": %d, \"to\": %d}", i, e->target->index);
-                    first_edge = 0;
-                }
-            }
-            fprintf(fp, "\n      ]\n");
-
-            /* Cleanup nodes and edges */
-            for (int i = 0; i < count; i++) {
-                SchedEdge *e = nodes[i].succs;
-                while (e) { SchedEdge *ne = e->next; free(e); e = ne; }
-                e = nodes[i].preds;
-                while (e) { SchedEdge *ne = e->next; free(e); e = ne; }
-            }
-            free(nodes);
-
-            fprintf(fp, "    }%s\n", (next_block) ? "," : "");
-
-            /* Restore tail */
-            curr->next = next_block;
-            first_of_block = next_block;
-            curr = next_block;
-            bcount = 0;
-        } else {
-            curr = curr->next;
         }
     }
 
-    fprintf(fp, "  ]\n");
+    /* Second pass: emit each block */
+    int first_block = 1;
+    for (int b = 0; b < block_count; b++) {
+        Block *cb = &blocks[b];
+        if (cb->count == 0) { free(cb->instrs); continue; }
+
+        int count = cb->count;
+
+        /* Save original next pointers */
+        IRInstr **saved_nexts = malloc(count * sizeof(IRInstr *));
+        for (int i = 0; i < count; i++) {
+            saved_nexts[i] = cb->instrs[i]->next;
+        }
+
+        /* Build a temporary instruction chain for DAG building */
+        for (int i = 0; i < count - 1; i++)
+            cb->instrs[i]->next = cb->instrs[i + 1];
+        cb->instrs[count - 1]->next = NULL;
+
+        SchedNode *nodes = calloc(count, sizeof(SchedNode));
+        for (int i = 0; i < count; i++) {
+            nodes[i].instr      = cb->instrs[i];
+            nodes[i].index      = i;
+            nodes[i].is_barrier = is_barrier(cb->instrs[i]);
+            nodes[i].is_load    = (cb->instrs[i]->kind == IR_LOAD);
+            nodes[i].is_store   = (cb->instrs[i]->kind == IR_STORE);
+            nodes[i].is_call    = (cb->instrs[i]->kind == IR_CALL || cb->instrs[i]->kind == IR_CALL_INDIRECT);
+        }
+        build_dag(nodes, count);
+        compute_priorities(nodes, count);
+
+        if (!first_block) fprintf(fp, ",\n");
+        first_block = 0;
+
+        fprintf(fp, "    {\n");
+        fprintf(fp, "      \"id\": %d,\n", b + 1);
+
+        /* Nodes */
+        fprintf(fp, "      \"nodes\": [\n");
+        for (int i = 0; i < count; i++) {
+            char buf[256];
+            ir_snprint_instr(buf, sizeof(buf), nodes[i].instr);
+            /* Escape backslashes and quotes for JSON */
+            char escaped[512]; int ei = 0;
+            for (int ci = 0; buf[ci] && ei < 510; ci++) {
+                if (buf[ci] == '"' || buf[ci] == '\\') escaped[ei++] = '\\';
+                escaped[ei++] = buf[ci];
+            }
+            escaped[ei] = '\0';
+            fprintf(fp, "        {\"id\": %d, \"label\": \"%s\", \"priority\": %d}%s\n",
+                    i, escaped, nodes[i].est_completion_time, (i == count - 1) ? "" : ",");
+        }
+        fprintf(fp, "      ],\n");
+
+        /* Edges */
+        fprintf(fp, "      \"edges\": [\n");
+        int first_edge = 1;
+        for (int i = 0; i < count; i++) {
+            for (SchedEdge *e = nodes[i].succs; e; e = e->next) {
+                if (!first_edge) fprintf(fp, ",\n");
+                fprintf(fp, "        {\"from\": %d, \"to\": %d}", i, e->target->index);
+                first_edge = 0;
+            }
+        }
+        fprintf(fp, "\n      ]\n");
+        fprintf(fp, "    }");
+
+        /* Cleanup edges */
+        for (int i = 0; i < count; i++) {
+            SchedEdge *e = nodes[i].succs;
+            while (e) { SchedEdge *ne = e->next; free(e); e = ne; }
+            e = nodes[i].preds;
+            while (e) { SchedEdge *ne = e->next; free(e); e = ne; }
+        }
+        free(nodes);
+        
+        /* Restore original next pointers */
+        for (int i = 0; i < count; i++) {
+            cb->instrs[i]->next = saved_nexts[i];
+        }
+        free(saved_nexts);
+        free(cb->instrs);
+    }
+
+    fprintf(fp, "\n  ]\n");
     fprintf(fp, "}\n");
     fclose(fp);
 }
+

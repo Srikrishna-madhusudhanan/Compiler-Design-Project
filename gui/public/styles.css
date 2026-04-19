@@ -77,7 +77,8 @@ header {
     background-color: #000;
 }
 
-#left-pane { width: 400px; min-width: 100px; }
+#left-pane { width: 400px; min-width: 100px; overflow-y: auto; }
+
 #center-pane { flex: 1; display: flex; flex-direction: column; min-width: 200px; }
 #right-pane { width: 350px; min-width: 100px; }
 
@@ -451,6 +452,13 @@ select {
 .live-tag.active {
     background: var(--accent-color);
     color: var(--bg-color);
+}
+
+.live-tag.spill-tag {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.5);
+    font-weight: 700;
 }
 
 /* Step Indicator */

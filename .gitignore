@@ -1,6 +1,7 @@
 # Build directory
 build/
 venv/
+optim/
 
 # Outputs
 *.dot

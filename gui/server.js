@@ -30,18 +30,9 @@ app.post('/api/compile', (req, res) => {
 
     let optFlag = `-O${optimizationLevel}`;
     let metricsFlag = useMetrics ? '--metrics' : '';
-    const timeOutFile = path.join(ROOT_DIR, 'compiler_time.txt');
+    const command = `${COMPILER_PATH} ${optFlag} ${metricsFlag} "${tempFile}"`;
 
-    // Use /usr/bin/time to measure the compiler itself — real execution time + memory
-    const hasGnuTime = fs.existsSync('/usr/bin/time');
-    let command;
-    if (hasGnuTime && useMetrics) {
-        command = `/usr/bin/time -f "%e %M" -o "${timeOutFile}" ${COMPILER_PATH} ${optFlag} ${metricsFlag} "${tempFile}"`;
-    } else {
-        command = `${COMPILER_PATH} ${optFlag} ${metricsFlag} "${tempFile}"`;
-    }
-
-    exec(command, { cwd: ROOT_DIR }, (error, stdout, stderr) => {
+    exec(command, { cwd: ROOT_DIR, timeout: 60000 }, (error, stdout, stderr) => {
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
 
         let result = {
@@ -66,29 +57,42 @@ app.post('/api/compile', (req, res) => {
         if (fs.existsSync(metricsFile)) {
             let metricsText = fs.readFileSync(metricsFile, 'utf8');
 
-            // Inject compiler-measured time+memory from /usr/bin/time output
-            if (hasGnuTime && useMetrics && fs.existsSync(timeOutFile)) {
-                try {
-                    const raw = fs.readFileSync(timeOutFile, 'utf8').trim();
-                    // /usr/bin/time -f "%e %M" => "0.12 3456"
-                    const match = raw.match(/^([\d.]+)\s+(\d+)/m);
-                    if (match) {
-                        const execTime = match[1];
-                        const execTimeNs = (parseFloat(execTime) * 1000000000).toFixed(0);
-                        const peakMem = match[2];
-                        // Replace or append into metrics file
-                        metricsText = metricsText.replace(/Execution time:.*\n?/, '');
-                        metricsText = metricsText.replace(/Peak memory usage:.*\n?/, '');
-                        metricsText = metricsText.replace(/==========================\n?/, '');
-                        metricsText += `Execution time:                         ${execTimeNs} ns\n`;
-                        metricsText += `Peak memory usage:                      ${peakMem} KB\n`;
-                        metricsText += `==========================\n`;
-                        fs.writeFileSync(metricsFile, metricsText);
-                    }
-                } catch (e) {}
-            }
+            // Strip execution time and peak memory lines — these only belong in benchmark mode
+            metricsText = metricsText.replace(/Execution time.*\n?/gi, '');
+            metricsText = metricsText.replace(/Peak memory.*\n?/gi, '');
 
-            result.metrics = fs.readFileSync(metricsFile, 'utf8');
+            // Fix IR instruction counts by counting actual instruction lines from the IR files.
+            // (The C counter is unreliable after CFG flattening disconnects the linked list.)
+            function countIrLines(text) {
+                if (!text) return 0;
+                return text.split('\n').filter(l => {
+                    const t = l.trim();
+                    return t.length > 0
+                        && !t.startsWith('function')
+                        && !t.startsWith('===')
+                        && !t.startsWith('L') // skip labels
+                        || (t.match(/^L\w+:/) === null && t.length > 0
+                            && !t.startsWith('function') && !t.startsWith('==='));
+                }).length;
+            }
+            // Simpler, more correct: count lines that look like IR instructions
+            function countIR(irText) {
+                if (!irText) return 0;
+                let count = 0;
+                for (const line of irText.split('\n')) {
+                    const t = line.trim();
+                    if (!t) continue;
+                    if (t.startsWith('function ') || t.startsWith('===') || t.startsWith('---')) continue;
+                    count++;
+                }
+                return count;
+            }
+            const preCount = countIR(result.ir);
+            const postCount = countIR(result.ir_opt);
+            metricsText = metricsText.replace(/Code size \(IR instructions, pre-opt\):[^\n]*/, `Code size (IR instructions, pre-opt):    ${preCount}`);
+            metricsText = metricsText.replace(/Code size \(IR instructions, post-opt\):[^\n]*/, `Code size (IR instructions, post-opt):   ${postCount}`);
+
+            result.metrics = metricsText;
         }
 
         const astJsonFile = path.join(ROOT_DIR, 'ast.json');
@@ -105,9 +109,13 @@ app.post('/api/compile', (req, res) => {
             }
         });
 
+        const asmFile = path.join(ROOT_DIR, 'output.s');
+        if (fs.existsSync(asmFile)) result.asm = fs.readFileSync(asmFile, 'utf8');
+
         res.json(result);
     });
 });
+
 
 app.post('/api/run', (req, res) => {
     const { input } = req.body;
@@ -125,7 +133,7 @@ app.post('/api/run', (req, res) => {
     
     let command = `${qemuRunScript} --metrics ${tempFile} "${input || ''}"`;
     
-    exec(command, { cwd: ROOT_DIR }, (error, stdout, stderr) => {
+    exec(command, { cwd: ROOT_DIR, timeout: 60000 }, (error, stdout, stderr) => {
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
         
         let result = {

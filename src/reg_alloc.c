@@ -123,6 +123,14 @@ static int is_allocatable(const char *name, Scope *scope) {
     return 1;
 }
 
+/* Check if a variable is already in the persisted spill list */
+static int is_persisted_spill(const char *name, char **names, int count) {
+    for (int i = 0; i < count; i++) {
+        if (strcmp(name, names[i]) == 0) return 1;
+    }
+    return 0;
+}
+
 /* -----------------------------------------------------------------------
  * Phase 1+2: Build interference graph for one function.
  *
@@ -131,7 +139,7 @@ static int is_allocatable(const char *name, Scope *scope) {
  *     for each v in LIVE: add edge(r, v)
  *   We compute live sets by walking each basic block backward.
  * ----------------------------------------------------------------------- */
-static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
+static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **persisted_spills, int persisted_count) {
     InterferenceGraph *ig = calloc(1, sizeof(InterferenceGraph));
     ig->func_name = strdup(f->name);
 
@@ -145,9 +153,13 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
         for (int i = 0; i < fsym->param_count; i++) {
             Symbol *p_i = lookup_in_scope(fsym->scope, fsym->param_names[i]);
             const char *iname_i = p_i ? p_i->ir_name : fsym->param_names[i];
+            if (is_persisted_spill(iname_i, persisted_spills, persisted_count)) continue;
+
             for (int j = i + 1; j < fsym->param_count; j++) {
                 Symbol *p_j = lookup_in_scope(fsym->scope, fsym->param_names[j]);
                 const char *iname_j = p_j ? p_j->ir_name : fsym->param_names[j];
+                if (is_persisted_spill(iname_j, persisted_spills, persisted_count)) continue;
+
                 int u = ig_get_or_add(ig, iname_i);
                 int v = ig_get_or_add(ig, iname_j);
                 ig_add_edge(ig, u, v);
@@ -185,6 +197,8 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
         /* Copy live_out into our working live set */
         for (int i = 0; i < bb->live_out_count; i++) {
             if (!is_allocatable(bb->live_out[i], fsym ? fsym->scope : NULL)) continue;
+            if (is_persisted_spill(bb->live_out[i], persisted_spills, persisted_count)) continue;
+
             ig_get_or_add(ig, bb->live_out[i]);
             live = realloc(live, sizeof(char*) * (live_count + 1));
             live[live_count++] = strdup(bb->live_out[i]);
@@ -211,7 +225,9 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
             entry->asm_line = strdup(buf);
 
             /* --- Add interference edges at the definition point --- */
-            if (instr->result && is_allocatable(instr->result, fsym ? fsym->scope : NULL)) {
+            if (instr->result && is_allocatable(instr->result, fsym ? fsym->scope : NULL) && 
+                !is_persisted_spill(instr->result, persisted_spills, persisted_count)) {
+                
                 int def_idx = ig_get_or_add(ig, instr->result);
                 for (int j = 0; j < live_count; j++) {
                     if (strcmp(live[j], instr->result) == 0) continue;
@@ -253,6 +269,8 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg) {
             for (int j = 0; j < nops; j++) {
                 if (!ops[j] || ops[j]->is_const || !ops[j]->name) continue;
                 if (!is_allocatable(ops[j]->name, fsym ? fsym->scope : NULL)) continue;
+                if (is_persisted_spill(ops[j]->name, persisted_spills, persisted_count)) continue;
+
                 ig_get_or_add(ig, ops[j]->name);
                 /* Add to live set if not already present */
                 int found = 0;
@@ -494,18 +512,6 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
 
                 /* Insert:  t_new := load(s0, soff)  before current instr */
                 char *t_new = ir_new_temp();
-
-                /* Build a fake load: base=s0, index=const(soff), scale=1
-                 * We model this as IR_ASSIGN from a stack address.
-                 * Since riscv_gen already does lw for named vars with offsets,
-                 * we instead give it a direct memory model via a dedicated
-                 * spill-load IR_ASSIGN: result = operand(sname) —
-                 * but sname IS the spilled var, so we use the frame model.
-                 * Simpler: create an IR_ASSIGN t_new := sname (still spilled)
-                 * and let riscv_gen emit lw t_new, soff(s0).
-                 * Then rename the use to t_new (t_new will be short-lived
-                 * and get a real register next round).
-                 */
                 IRInstr *load_instr = ir_make_assign(t_new, ir_op_name(strdup(sname)), instr->line);
 
                 /* Insert before instr */
@@ -530,7 +536,9 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
 
                 /* Insert:  store to soff := t_def  after current instr */
                 IRInstr *store_instr = ir_make_assign(strdup(sname), ir_op_name(strdup(t_def)), instr->line);
-                store_instr->next = next;
+                
+                /* FIX: robust insertion prevents instruction loss when multiple variables are spilled */
+                store_instr->next = instr->next;
                 instr->next = store_instr;
                 /* DO NOT do `next = store_instr`. That causes an infinite loop by re-evaluating the spill! */
 
@@ -542,7 +550,7 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
         prev = instr;
         /* Advance prev past any store_instrs we inserted so it correctly borders next */
         while (prev && prev->next != next) prev = prev->next;
-        
+
         instr = next;
     }
 
@@ -554,13 +562,14 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
 /* -----------------------------------------------------------------------
  * Build RegAllocResult from a colored interference graph.
  * ----------------------------------------------------------------------- */
-static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name) {
+static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name, char **persisted_names, int *persisted_offsets, int persisted_count) {
+    int total_vars = ig->count + persisted_count;
     RegAllocResult *res = calloc(1, sizeof(RegAllocResult));
     res->func_name  = strdup(func_name);
-    res->var_count  = ig->count;
-    res->var_names  = malloc(sizeof(char*) * ig->count);
-    res->reg_index  = malloc(sizeof(int)   * ig->count);
-    res->spill_offset = malloc(sizeof(int) * ig->count);
+    res->var_count  = total_vars;
+    res->var_names  = malloc(sizeof(char*) * total_vars);
+    res->reg_index  = malloc(sizeof(int)   * total_vars);
+    res->spill_offset = malloc(sizeof(int) * total_vars);
 
     for (int i = 0; i < ig->count; i++) {
         res->var_names[i]    = strdup(ig->nodes[i].name);
@@ -571,6 +580,15 @@ static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name
         if (ig->nodes[i].color >= RA_FIRST_CALLEE_SAVED)
             res->callee_used[ig->nodes[i].color] = 1;
     }
+
+    /* Add persisted spills to result for the back-end */
+    for (int i = 0; i < persisted_count; i++) {
+        int idx = ig->count + i;
+        res->var_names[idx]    = strdup(persisted_names[i]);
+        res->reg_index[idx]    = -1;
+        res->spill_offset[idx] = persisted_offsets[i];
+    }
+
     return res;
 }
 
@@ -579,13 +597,17 @@ static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name
  * Iterates build→simplify→select→spill-rewrite until stable.
  * ----------------------------------------------------------------------- */
 static RegAllocResult *allocate_function(IRFunc *f) {
-    /* Spill slot counter: starts at -2048 (below the fixed frame area)
-     * Each spill occupies 4 bytes. */
-    int spill_offset_base = -512; /* Starting below the typical local area; riscv_gen will adjust frame size */
+    /* Spill slot counter: starts at -512 (below the fixed frame area) */
+    int spill_offset_base = -512;
 
     InterferenceGraph *ig   = NULL;
     RegAllocResult    *res  = NULL;
     int                rounds = 0;
+
+    /* Persisted spill tracking to prevent infinite loops / recursive rewriting */
+    char **persisted_names = NULL;
+    int   *persisted_offsets = NULL;
+    int    persisted_count = 0;
 
     for (;;) {
         rounds++;
@@ -604,12 +626,12 @@ static RegAllocResult *allocate_function(IRFunc *f) {
             return res;
         }
 
-        /* Phase 1+2: interference graph */
+        /* Phase 1+2: interference graph (ignoring already-spilled variables) */
         if (ig) ig_free(ig);
-        ig = build_interference_graph(f, cfg);
+        ig = build_interference_graph(f, cfg, persisted_names, persisted_count);
         free_cfg(cfg);
 
-        if (ig->count == 0) break; /* no variables to allocate */
+        if (ig->count == 0) break; /* no variables left to allocate */
 
         /* Phase 3: simplify */
         int stack_size;
@@ -621,16 +643,27 @@ static RegAllocResult *allocate_function(IRFunc *f) {
 
         if (n_spills == 0) break; /* coloring succeeded — done */
 
+        /* Record newly spilled variables to persisted list before rewrite */
+        for (int i = 0; i < ig->count; i++) {
+            if (ig->nodes[i].spilled) {
+                persisted_names = realloc(persisted_names, sizeof(char*) * (persisted_count + 1));
+                persisted_offsets = realloc(persisted_offsets, sizeof(int) * (persisted_count + 1));
+                persisted_names[persisted_count] = strdup(ig->nodes[i].name);
+                persisted_offsets[persisted_count] = ig->nodes[i].spill_offset;
+                persisted_count++;
+            }
+        }
+
         /* Phase 5: spill rewrite */
         int changed = rewrite_spills(f, ig);
-        if (!changed) break; /* nothing to rewrite (shouldn't happen) */
+        if (!changed) break; 
 
         /* Safety valve: at most 10 rounds */
         if (rounds >= 10) break;
     }
 
-    /* Build the result lookup table */
-    res = build_result(ig, f->name);
+    /* Build the result lookup table (including persisted spills) */
+    res = build_result(ig, f->name, persisted_names, persisted_offsets, persisted_count);
 
     /* Phase 6: export DOT and JSON (one per function, last round's graph) */
     char dot_path[128];
@@ -640,10 +673,14 @@ static RegAllocResult *allocate_function(IRFunc *f) {
     snprintf(json_path, sizeof(json_path), "%s_interference.json", f->name);
     snprintf(cfg_path, sizeof(cfg_path), "%s_cfg.json", f->name);
     
+    /* Clear old simplify trace from the allocation loop before re-running
+     * simplify for the JSON export, so the history is not duplicated. */
+    if (ig->simplify_trace) { free(ig->simplify_trace); ig->simplify_trace = NULL; }
+    ig->simplify_trace_count = 0;
+
     int final_stack_size;
     int *final_stack = simplify(ig, &final_stack_size);
     
-    // Refresh CFG for final export (though it shouldn't have changed much)
     CFG *final_cfg = build_cfg(f);
     compute_liveness(final_cfg);
     export_cfg_to_json(final_cfg, cfg_path);
@@ -653,6 +690,9 @@ static RegAllocResult *allocate_function(IRFunc *f) {
     reg_alloc_export_json(ig, res, final_stack, final_stack_size, json_path);
 
     free(final_stack);
+    for(int i=0; i<persisted_count; i++) free(persisted_names[i]);
+    free(persisted_names);
+    free(persisted_offsets);
     ig_free(ig);
     return res;
 }

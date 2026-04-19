@@ -8,6 +8,8 @@ const optLevel = document.getElementById('opt-level');
 const exampleSelect = document.getElementById('example-select');
 const animAstBtn = document.getElementById('anim-ast');
 const animRaBtn = document.getElementById('anim-ra');
+const asmOutput = document.getElementById('asm-output');
+
 
 // Metrics Elements
 const mPreIr = document.getElementById('m-pre-ir');
@@ -138,58 +140,62 @@ async function animateRa(data) {
         log('No register allocation data available.', 'warning');
         return;
     }
-    log('Starting premium Register Allocation Trace...', 'info');
+    log('🎬 Replaying Register Allocation animation...', 'info');
     
     const stackEl = document.getElementById('ra-stack');
     stackEl.innerHTML = ''; // Reset stack
-    
-    // Premium Vibrant Palette (Glassmorphism & Neon)
-    const palette = [
-        "#38bdf8", "#818cf8", "#c084fc", "#f472b6", "#fb7185", 
-        "#fb923c", "#fbbf24", "#a3e635", "#4ade80", "#2dd4bf",
-        "#22d3ee", "#60a5fa", "#a78bfa", "#e879f9", "#f43f5e"
-    ];
 
+    // Start fresh: reset all nodes to grey (uncolored) state, keeping same layout
     const nodes = new vis.DataSet(data.nodes.map(n => ({ 
         id: n.id, 
-        label: n.name, 
-        color: {
-            background: '#334155',
-            border: '#475569'
-        },
-        font: { color: '#ffffff', face: 'Inter', size: 16 },
-        size: 25,
-        shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 5 }
+        label: n.name,
+        color: { background: '#1e293b', border: '#334155' },
+        font: { color: '#64748b', face: 'Fira Code', size: 13 },
+        shape: 'dot',
+        size: 22,
+        shadow: false
     })));
     
     const edges = new vis.DataSet(data.edges.map(e => ({
         ...e,
-        color: { color: '#475569', highlight: '#38bdf8' },
-        width: 2
+        color: { color: '#1e3a5f', opacity: 0.8 },
+        width: 1.5,
+        smooth: { type: 'continuous' }
     })));
 
     const container = document.getElementById('ra-viz');
     const options = {
         physics: {
             enabled: true,
-            barnesHut: { gravitationalConstant: -2000, centralGravity: 0.3, springLength: 100 },
-            stabilization: { iterations: 100 }
+            barnesHut: {
+                gravitationalConstant: -6000,
+                centralGravity: 0.25,
+                springLength: 110,
+                springConstant: 0.04,
+                damping: 0.15,
+                avoidOverlap: 0.5
+            },
+            stabilization: { enabled: true, iterations: 250, fit: true }
         },
-        nodes: { shape: 'dot' },
-        edges: { width: 2 }
-    };
-    
-    raNetwork = new vis.Network(container, { nodes, edges }, options);
-    
-    // Responsive fit logic
-    const fitNetwork = () => {
-        if (raNetwork) raNetwork.fit({ animation: { duration: 1000, easingFunction: 'easeInOutQuad' } });
+        interaction: { hover: true },
+        nodes: { borderWidth: 2 },
+        edges: { width: 1.5 }
     };
 
-    raNetwork.once('stabilizationIterationsDone', fitNetwork);
+    if (raNetwork) raNetwork.destroy();
+    raNetwork = new vis.Network(container, { nodes, edges }, options);
+
+    await new Promise(resolve => {
+        raNetwork.once('stabilizationIterationsDone', () => {
+            raNetwork.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+            raNetwork.setOptions({ physics: { enabled: false } });
+            resolve();
+        });
+    });
+
+    // Keep layout locked on window resize too
+    const fitNetwork = () => { if (raNetwork) raNetwork.fit(); };
     window.addEventListener('resize', fitNetwork);
-    
-    // Ensure we clean up old listeners if we re-run
     raNetwork.on('destroy', () => window.removeEventListener('resize', fitNetwork));
 
     // 1. Simplify Phase (Pushing to stack)
@@ -233,22 +239,23 @@ async function animateRa(data) {
         if (nodeData.spilled) {
             nodes.update({ 
                 id: step.node_idx, 
-                color: { background: '#ef4444', border: '#f87171' },
-                font: { color: '#ffffff', size: 18 },
-                size: 35,
-                label: `${nodeData.name}\n(SPILL)`,
+                color: { background: '#7f1d1d', border: '#ef4444' },
+                font: { color: '#fca5a5', size: 14, face: 'Fira Code', bold: true },
+                size: 30,
+                shape: 'box',
+                label: `🔴 ${nodeData.name}\n(SPILL)`,
                 shadow: { enabled: true, color: 'rgba(239, 68, 68, 0.8)', size: 15 }
             });
         } else if (nodeData.color >= 0) {
-            const color = palette[nodeData.color % palette.length];
+            const color = RA_PALETTE[nodeData.color % RA_PALETTE.length];
             const regName = data.reg_names ? data.reg_names[nodeData.color] : nodeData.color;
             nodes.update({ 
                 id: step.node_idx, 
                 color: { background: color, border: '#ffffff' },
-                font: { color: '#ffffff', size: 18 },
-                size: 35,
+                font: { color: '#0f172a', size: 14, face: 'Fira Code', bold: true },
+                size: 30,
                 label: `${nodeData.name}\n(${regName})`,
-                shadow: { enabled: true, color: color, size: 20 }
+                shadow: { enabled: true, color: color + 'cc', size: 16 }
             });
         }
         
@@ -261,8 +268,89 @@ async function animateRa(data) {
     log('Register Allocation coloring complete.', 'success');
 }
 
+// RA Color Palette (15 registers = 15 colors)
+const RA_PALETTE = [
+    "#38bdf8", "#818cf8", "#c084fc", "#f472b6", "#fb7185",
+    "#fb923c", "#fbbf24", "#a3e635", "#4ade80", "#2dd4bf",
+    "#22d3ee", "#60a5fa", "#a78bfa", "#e879f9", "#f43f5e"
+];
+
+// Static render of final colored RA graph (runs immediately after compile)
+function renderRaGraph(data) {
+    if (!data || !data.nodes || data.nodes.length === 0) return;
+
+    const container = document.getElementById('ra-viz');
+
+    const visNodes = new vis.DataSet(data.nodes.map(n => {
+        if (n.spilled) {
+            return {
+                id: n.id,
+                label: `🔴 ${n.name}\n(SPILL @${n.spill_offset})`,
+                color: { background: '#7f1d1d', border: '#ef4444' },
+                font: { color: '#fca5a5', face: 'Fira Code', size: 13, bold: true },
+                shape: 'box',
+                shadow: { enabled: true, color: 'rgba(239,68,68,0.6)', size: 12 },
+                size: 30
+            };
+        } else {
+            const c = RA_PALETTE[n.color % RA_PALETTE.length] || '#38bdf8';
+            const regName = data.reg_names ? data.reg_names[n.color] : `r${n.color}`;
+            return {
+                id: n.id,
+                label: `${n.name}\n(${regName})`,
+                color: { background: c, border: '#ffffff' },
+                font: { color: '#0f172a', face: 'Fira Code', size: 12, bold: true },
+                shape: 'dot',
+                shadow: { enabled: true, color: c + 'aa', size: 10 },
+                size: 25
+            };
+        }
+    }));
+
+    const visEdges = new vis.DataSet(data.edges.map((e, i) => ({
+        id: i,
+        from: e.from,
+        to: e.to,
+        color: { color: '#334155', opacity: 0.7 },
+        width: 1.5,
+        smooth: { type: 'continuous' }
+    })));
+
+    const options = {
+        physics: {
+            enabled: true,
+            barnesHut: {
+                gravitationalConstant: -6000,
+                centralGravity: 0.25,
+                springLength: 110,
+                springConstant: 0.04,
+                damping: 0.15,
+                avoidOverlap: 0.5
+            },
+            stabilization: { enabled: true, iterations: 250, fit: true }
+        },
+        interaction: { hover: true },
+        nodes: { borderWidth: 2 },
+        edges: { width: 1.5 }
+    };
+
+    if (raNetwork) raNetwork.destroy();
+    raNetwork = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
+    raNetwork.once('stabilizationIterationsDone', () => {
+        raNetwork.setOptions({ physics: { enabled: false } });
+        raNetwork.fit({ animation: { duration: 500 } });
+    });
+
+    log(`RA graph: ${data.nodes.length} vars, ${data.edges.length} interferences, ${new Set(data.nodes.filter(n=>!n.spilled).map(n=>n.color)).size} colors used.`, 'success');
+    const spills = data.nodes.filter(n => n.spilled);
+    if (spills.length > 0) log(`⚠️ ${spills.length} variable(s) spilled to stack: ${spills.map(n=>n.name).join(', ')}`, 'warning');
+}
+
 // Register Usage Map Rendering
 function renderRegisterUsage(data) {
+    // Draw interference graph with final colors
+    renderRaGraph(data);
+
     const body = document.getElementById('usage-body');
     if (!data || !data.liveness_history) {
         body.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #444; padding: 20px;">No liveness data.</td></tr>';
@@ -286,13 +374,19 @@ function renderRegisterUsage(data) {
         
         step.live.forEach(varName => {
             const span = document.createElement('span');
-            span.className = 'live-tag';
-            
-            // Try to find the register for this variable
             const node = data.nodes.find(n => n.name === varName);
-            const regName = (node && node.color >= 0 && data.reg_names) ? ` (${data.reg_names[node.color]})` : '';
-            
-            span.textContent = varName + regName;
+            if (node && node.spilled) {
+                span.className = 'live-tag spill-tag';
+                span.textContent = `${varName} (SPILL)`;
+            } else {
+                const regName = (node && node.color >= 0 && data.reg_names) ? ` → ${data.reg_names[node.color]}` : '';
+                span.className = 'live-tag';
+                if (node && node.color >= 0) {
+                    span.style.borderColor = RA_PALETTE[node.color % RA_PALETTE.length];
+                    span.style.color = RA_PALETTE[node.color % RA_PALETTE.length];
+                }
+                span.textContent = varName + regName;
+            }
             tagsDiv.appendChild(span);
         });
         
@@ -363,18 +457,25 @@ compileBtn.addEventListener('click', async () => {
             log('Compilation successful.', 'success');
             irOutput.textContent = data.ir_opt || data.ir;
             
-            // Parse Metrics
+            // Parse Metrics (compile mode: only IR counts, no exec time/mem)
             const metrics = parseMetrics(data.metrics);
             updateDashboard(metrics);
+            // Explicitly clear runtime metrics — they only belong to benchmark mode
+            mTime.textContent = '-';
+            mMem.textContent = '-';
+            mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ms)';
             
             currentAstData = data.ast_json;
             currentRaData = data.ra_json[0]; // Take first function
             currentCfgData = data.cfg_json[0];
             
             // Static viz
-            renderStaticViz(currentAstData, currentRaData);
+            if (data.asm) asmOutput.textContent = data.asm;
+            else asmOutput.textContent = 'Assembly not generated.';
+
             if (currentCfgData) renderCFG(currentCfgData);
             if (currentRaData) renderRegisterUsage(currentRaData);
+
         }
     } catch (e) {
         log('Connection error.', 'error');
@@ -387,35 +488,39 @@ function parseMetrics(text) {
     if (!text) return {};
     const metrics = {};
     const lines = text.split('\n');
-    // Iterate ALL lines and keep OVERWRITING — so the LAST occurrence wins.
-    // This ensures QEMU runtime values (appended later) override compile-time placeholder values.
+    
     lines.forEach(line => {
+        // Handle pre/post IR counts
         const preMatch = line.match(/IR instructions, pre-opt.*:\s+(\d+)/i);
         if (preMatch) metrics.preIr = parseInt(preMatch[1]);
         
         const postMatch = line.match(/IR instructions, post-opt.*:\s+(\d+)/i);
         if (postMatch) metrics.postIr = parseInt(postMatch[1]);
 
-        // Match both "Execution time:" (compile) and "Execution time (wall):" (QEMU)
-        const timeMatch = line.match(/Execution time(?:\s*\(wall\))?:\s+([\d\.]+)/i);
+        // Handle execution time (wall)
+        const timeMatch = line.match(/Execution time(?:\s*\(wall\))?:\s*([\d\.,]+)/i);
         if (timeMatch) {
-            metrics.time = parseFloat(timeMatch[1]);
-            if (line.includes('ns')) metrics.unit = 'ns';
+            metrics.time = parseFloat(timeMatch[1].replace(/,/g, ''));
+            if (line.toLowerCase().includes('ns')) metrics.unit = 'ns';
+            else if (line.toLowerCase().includes('ms')) metrics.unit = 'ms';
+            else if (line.toLowerCase().includes(' us')) metrics.unit = 'us';
+            else metrics.unit = 's';
         }
 
-        // Match both "Peak memory usage:" and "Peak memory:" formats
+        // Handle peak memory
         const memMatch = line.match(/Peak memory(?:\s+usage)?.*:\s+(.*)/i);
         if (memMatch) {
             const rawVal = memMatch[1].trim();
-            const val = rawVal.split(/\s+/)[0];  // handles trailing newlines/spaces
+            const val = rawVal.split(/\s+/)[0].replace(/,/g, '');
             const parsedMem = parseInt(val);
             if (!isNaN(parsedMem)) {
                 metrics.mem = parsedMem;
-            } else if (rawVal === 'Unknown') {
+            } else if (rawVal.toLowerCase().includes('unknown')) {
                 metrics.mem = 'Unknown';
             }
         }
     });
+
     return metrics;
 }
 
@@ -426,6 +531,10 @@ function updateDashboard(metrics) {
     if (metrics.time !== undefined && !isNaN(metrics.time)) {
         if (metrics.unit === 'ns') {
             mTime.textContent = Math.round(metrics.time);
+            mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ns)';
+        } else if (metrics.unit === 'ms') {
+            mTime.textContent = metrics.time.toFixed(2);
+            mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ms)';
         } else {
             mTime.textContent = metrics.time.toFixed(6);
         }
@@ -461,25 +570,49 @@ animAstBtn.addEventListener('click', () => animateAst(currentAstData));
 animRaBtn.addEventListener('click', () => animateRa(currentRaData));
 
 runBtn.addEventListener('click', async () => {
+    if (!editor.value.trim()) { log('No code to run. Write or load a program first.', 'warning'); return; }
     log('Running Benchmarks with QEMU...', 'info');
     runBtn.disabled = true;
+    const origLabel = runBtn.textContent;
+    runBtn.textContent = '⏳ Running...';
+
+    // Countdown shown on button
+    let seconds = 0;
+    const timer = setInterval(() => { seconds++; runBtn.textContent = `⏳ Running... ${seconds}s`; }, 1000);
+
     try {
         const response = await fetch('/api/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                code: editor.value,
-                input: "" 
-            })
+            body: JSON.stringify({ code: editor.value, input: "" })
         });
+        clearInterval(timer);
         const data = await response.json();
-        log(data.stdout || 'Run complete');
+
+        if (data.stdout) log('Program output: ' + data.stdout, 'success');
+        if (data.stderr) log('Stderr: ' + data.stderr, 'warning');
+        if (data.error) {
+            if (data.error.includes('killed') || data.error.includes('SIGTERM')) {
+                log('⚠️ Program killed — exceeded 60s timeout (infinite loop?)', 'error');
+            } else {
+                log('Error: ' + data.error, 'error');
+            }
+        }
+
         const metrics = parseMetrics(data.metrics);
-        updateDashboard(metrics);
+        if (metrics.time !== undefined) {
+            updateDashboard(metrics);
+            log(`✅ Exec time: ${metrics.time} ms | Peak memory: ${metrics.mem} KB`, 'success');
+        } else {
+            log('⚠️ Metrics not available — did you compile first?', 'warning');
+        }
     } catch (e) {
-        log('Run failed.', 'error');
+        clearInterval(timer);
+        log('Run failed or timed out: ' + e.message, 'error');
     } finally {
+        clearInterval(timer);
         runBtn.disabled = false;
+        runBtn.textContent = origLabel;
     }
 });
 
@@ -607,15 +740,31 @@ async function animateSched() {
             return;
         }
 
-        const block = data.blocks[0];
-        log(`⚡ Visualizing Dependency DAG — Block ${block.id} (${block.nodes.length} instructions)`, 'info');
+        // Combine ALL blocks into one DAG with globally-unique IDs
+        const allNodes = [];
+        const allEdges = [];
+        let globalOffset = 0;
 
-        const maxPriority = Math.max(...block.nodes.map(n => n.priority), 1);
+        for (const block of data.blocks) {
+            if (!block.nodes || block.nodes.length === 0) { globalOffset += 0; continue; }
 
-        const nodesDataset = new vis.DataSet(block.nodes.map(n => ({
+            log(`⚡ Block ${block.id}: ${block.nodes.length} instructions`, 'info');
+
+            for (const n of block.nodes) {
+                allNodes.push({ ...n, id: globalOffset + n.id, blockId: block.id });
+            }
+            for (const e of (block.edges || [])) {
+                allEdges.push({ from: globalOffset + e.from, to: globalOffset + e.to });
+            }
+            globalOffset += block.nodes.length;
+        }
+
+        const maxPriority = Math.max(...allNodes.map(n => n.priority), 1);
+
+        const nodesDataset = new vis.DataSet(allNodes.map(n => ({
             id: n.id,
             label: n.label.trim(),
-            title: `Priority: ${n.priority}`,
+            title: `Block ${n.blockId} | Priority: ${n.priority}`,
             color: { background: SCHED_PALETTES.idle.bg, border: SCHED_PALETTES.idle.border },
             font: { color: '#64748b', face: 'Fira Code', size: 12, bold: false },
             shape: 'box',
@@ -624,7 +773,7 @@ async function animateSched() {
             shadow: false
         })));
 
-        const edgesDataset = new vis.DataSet(block.edges.map((e, i) => ({
+        const edgesDataset = new vis.DataSet(allEdges.map((e, i) => ({
             id: i,
             from: e.from,
             to: e.to,
@@ -632,18 +781,17 @@ async function animateSched() {
             color: { color: '#1e3a5f', highlight: '#38bdf8', opacity: 0.7 },
             width: 1.5,
             smooth: { type: 'curvedCW', roundness: 0.2 },
-            dashes: false
         })));
 
         const container = document.getElementById('sched-viz');
         const options = {
-            layout: { 
-                hierarchical: { 
-                    direction: 'UD', 
+            layout: {
+                hierarchical: {
+                    direction: 'UD',
                     sortMethod: 'directed',
-                    nodeSpacing: 160,
-                    levelSeparation: 110
-                } 
+                    nodeSpacing: 140,
+                    levelSeparation: 100
+                }
             },
             physics: false,
             interaction: { hover: true, tooltipDelay: 100 },
@@ -654,14 +802,14 @@ async function animateSched() {
         schedNetwork = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
         schedNetwork.fit({ animation: { duration: 500 } });
 
-        // ---- Animation: schedule nodes in priority order ----
-        await new Promise(r => setTimeout(r, 800));
+        // Animate: schedule nodes in priority order across all blocks
+        await new Promise(r => setTimeout(r, 600));
         log('🎬 Animating scheduling order (critical path first)...', 'info');
 
-        const sortedNodes = [...block.nodes].sort((a, b) => b.priority - a.priority);
+        const sortedNodes = [...allNodes].sort((a, b) => b.priority - a.priority);
 
         for (let node of sortedNodes) {
-            await new Promise(r => setTimeout(r, 700));
+            await new Promise(r => setTimeout(r, 500));
 
             const tier = getSchedTier(node.priority, maxPriority);
             const pal = SCHED_PALETTES[tier];
@@ -674,13 +822,13 @@ async function animateSched() {
                 borderWidth: 2
             });
 
-            // Highlight outgoing dependency edges
-            const outEdges = block.edges
-                .filter(e => e.from === node.id)
-                .map((e, i) => ({ id: block.edges.indexOf(e), color: { color: pal.border, opacity: 1 }, width: 2.5 }));
-            outEdges.forEach(eu => edgesDataset.update(eu));
+            // Highlight outgoing edges
+            const outEdges = allEdges
+                .map((e, i) => ({ ...e, id: i }))
+                .filter(e => e.from === node.id);
+            outEdges.forEach(eu => edgesDataset.update({ id: eu.id, color: { color: pal.border, opacity: 1 }, width: 2.5 }));
 
-            log(`→ Scheduled: "${node.label.trim()}" [${tier.toUpperCase()}, priority: ${node.priority}]`, 
+            log(`→ Scheduled: "${node.label.trim()}" [Block ${node.blockId}] [${tier.toUpperCase()}, priority: ${node.priority}]`,
                 tier === 'critical' ? 'warning' : 'success');
         }
 
@@ -691,5 +839,6 @@ async function animateSched() {
         log(`Error: ${err.message}`, 'error');
     }
 }
+
 
 document.getElementById('anim-sched').addEventListener('click', animateSched);
