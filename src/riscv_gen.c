@@ -138,10 +138,20 @@ static void load_operand(FILE *out, IROperand op, const char *dst_reg) {
     } else {
         /* Spilled or stack variable */
         int size = get_operand_size(op.name);
-        if (size == 8)
-            fprintf(out, "  ld %s, %d(s0)\n", dst_reg, get_offset(op.name));
-        else
-            fprintf(out, "  lw %s, %d(s0)\n", dst_reg, get_offset(op.name));
+        int offset = get_offset(op.name);
+        if (offset >= -2048 && offset <= 2047) {
+            if (size == 8)
+                fprintf(out, "  ld %s, %d(s0)\n", dst_reg, offset);
+            else
+                fprintf(out, "  lw %s, %d(s0)\n", dst_reg, offset);
+        } else {
+            fprintf(out, "  li t2, %d\n", offset);
+            fprintf(out, "  add t2, s0, t2\n");
+            if (size == 8)
+                fprintf(out, "  ld %s, 0(t2)\n", dst_reg);
+            else
+                fprintf(out, "  lw %s, 0(t2)\n", dst_reg);
+        }
     }
 }
 
@@ -160,10 +170,20 @@ static void store_result(FILE *out, const char *result_name, const char *src_reg
             fprintf(out, "  mv %s, %s\n", phys, src_reg);
     } else {
         int size = get_operand_size(result_name);
-        if (size == 8)
-            fprintf(out, "  sd %s, %d(s0)\n", src_reg, get_offset(result_name));
-        else
-            fprintf(out, "  sw %s, %d(s0)\n", src_reg, get_offset(result_name));
+        int offset = get_offset(result_name);
+        if (offset >= -2048 && offset <= 2047) {
+            if (size == 8)
+                fprintf(out, "  sd %s, %d(s0)\n", src_reg, offset);
+            else
+                fprintf(out, "  sw %s, %d(s0)\n", src_reg, offset);
+        } else {
+            fprintf(out, "  li t2, %d\n", offset);
+            fprintf(out, "  add t2, s0, t2\n");
+            if (size == 8)
+                fprintf(out, "  sd %s, 0(t2)\n", src_reg);
+            else
+                fprintf(out, "  sw %s, 0(t2)\n", src_reg);
+        }
     }
 }
 
@@ -188,15 +208,29 @@ static void load_address(FILE *out, IROperand op, const char *dst_reg) {
                 fprintf(out, "  mv %s, %s\n", dst_reg, phys);
         } else {
             int size = get_operand_size(op.name);
-            if (size == 8)
-                fprintf(out, "  ld %s, %d(s0)\n", dst_reg, off);
-            else
-                fprintf(out, "  lw %s, %d(s0)\n", dst_reg, off);
+            if (off >= -2048 && off <= 2047) {
+                if (size == 8)
+                    fprintf(out, "  ld %s, %d(s0)\n", dst_reg, off);
+                else
+                    fprintf(out, "  lw %s, %d(s0)\n", dst_reg, off);
+            } else {
+                fprintf(out, "  li t2, %d\n", off);
+                fprintf(out, "  add t2, s0, t2\n");
+                if (size == 8)
+                    fprintf(out, "  ld %s, 0(t2)\n", dst_reg);
+                else
+                    fprintf(out, "  lw %s, 0(t2)\n", dst_reg);
+            }
         }
     } else if (!sym && get_reg(op.name)) {
         fprintf(out, "  mv %s, %s\n", dst_reg, get_reg(op.name));
     } else {
-        fprintf(out, "  addi %s, s0, %d\n", dst_reg, off);
+        if (off >= -2048 && off <= 2047) {
+            fprintf(out, "  addi %s, s0, %d\n", dst_reg, off);
+        } else {
+            fprintf(out, "  li %s, %d\n", dst_reg, off);
+            fprintf(out, "  add %s, s0, %s\n", dst_reg, dst_reg);
+        }
     }
 }
 
@@ -210,7 +244,13 @@ static void emit_callee_saves(FILE *out, RegAllocResult *ra, int frame_size) {
     int slot = frame_size - 24; /* ra at -8, s0 at -16, callee-saves start at -24 */
     for (int i = RA_FIRST_CALLEE_SAVED; i < RA_NUM_REGS; i++) {
         if (ra->callee_used[i]) {
-            fprintf(out, "  sd %s, %d(sp)\n", RA_REG_NAMES[i], slot);
+            if (slot >= -2048 && slot <= 2047) {
+                fprintf(out, "  sd %s, %d(sp)\n", RA_REG_NAMES[i], slot);
+            } else {
+                fprintf(out, "  li t2, %d\n", slot);
+                fprintf(out, "  add t2, sp, t2\n");
+                fprintf(out, "  sd %s, 0(t2)\n", RA_REG_NAMES[i]);
+            }
             slot -= 8;
         }
     }
@@ -221,7 +261,13 @@ static void emit_callee_restores(FILE *out, RegAllocResult *ra, int frame_size) 
     int slot = frame_size - 24;
     for (int i = RA_FIRST_CALLEE_SAVED; i < RA_NUM_REGS; i++) {
         if (ra->callee_used[i]) {
-            fprintf(out, "  ld %s, %d(sp)\n", RA_REG_NAMES[i], slot);
+            if (slot >= -2048 && slot <= 2047) {
+                fprintf(out, "  ld %s, %d(sp)\n", RA_REG_NAMES[i], slot);
+            } else {
+                fprintf(out, "  li t2, %d\n", slot);
+                fprintf(out, "  add t2, sp, t2\n");
+                fprintf(out, "  ld %s, 0(t2)\n", RA_REG_NAMES[i]);
+            }
             slot -= 8;
         }
     }
@@ -367,11 +413,35 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
 
         /* --- PROLOGUE --- */
         fprintf(out, "  # --- Prologue (Frame Size: %d) ---\n", frame_size);
-        fprintf(out, "  addi sp, sp, -%d\n", frame_size);
-        fprintf(out, "  sd ra, %d(sp)\n", frame_size - 8);
-        fprintf(out, "  sd s0, %d(sp)\n", frame_size - 16);
+        if (frame_size >= -2048 && frame_size <= 2047) {
+            fprintf(out, "  addi sp, sp, -%d\n", frame_size);
+        } else {
+            fprintf(out, "  li t2, %d\n", -frame_size);
+            fprintf(out, "  add sp, sp, t2\n");
+        }
+        int ra_offset = frame_size - 8;
+        if (ra_offset >= -2048 && ra_offset <= 2047) {
+            fprintf(out, "  sd ra, %d(sp)\n", ra_offset);
+        } else {
+            fprintf(out, "  li t2, %d\n", ra_offset);
+            fprintf(out, "  add t2, sp, t2\n");
+            fprintf(out, "  sd ra, 0(t2)\n");
+        }
+        int s0_offset = frame_size - 16;
+        if (s0_offset >= -2048 && s0_offset <= 2047) {
+            fprintf(out, "  sd s0, %d(sp)\n", s0_offset);
+        } else {
+            fprintf(out, "  li t2, %d\n", s0_offset);
+            fprintf(out, "  add t2, sp, t2\n");
+            fprintf(out, "  sd s0, 0(t2)\n");
+        }
         emit_callee_saves(out, cur_ra, frame_size);
-        fprintf(out, "  addi s0, sp, %d\n\n", frame_size);
+        if (frame_size >= -2048 && frame_size <= 2047) {
+            fprintf(out, "  addi s0, sp, %d\n\n", frame_size);
+        } else {
+            fprintf(out, "  li t2, %d\n", frame_size);
+            fprintf(out, "  add s0, sp, t2\n\n");
+        }
 
         /* --- Labels for exit and tail recursion --- */
         char tail_entry_label[128];
@@ -552,11 +622,35 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     if (instr->is_tail_call) {
                         /* Tail call to a different function: unwind frame and jump to callee. */
                         fprintf(out, "  # Tail call to another function: unwind current frame\n");
-                        fprintf(out, "  addi sp, s0, -%d\n", frame_size);
+                        if (frame_size >= -2048 && frame_size <= 2047) {
+                            fprintf(out, "  addi sp, s0, -%d\n", frame_size);
+                        } else {
+                            fprintf(out, "  li t2, %d\n", -frame_size);
+                            fprintf(out, "  add sp, s0, t2\n");
+                        }
                         emit_callee_restores(out, cur_ra, frame_size);
-                        fprintf(out, "  ld ra, %d(sp)\n", frame_size - 8);
-                        fprintf(out, "  ld s0, %d(sp)\n", frame_size - 16);
-                        fprintf(out, "  addi sp, sp, %d\n", frame_size);
+                        int ra_offset_tc = frame_size - 8;
+                        if (ra_offset_tc >= -2048 && ra_offset_tc <= 2047) {
+                            fprintf(out, "  ld ra, %d(sp)\n", ra_offset_tc);
+                        } else {
+                            fprintf(out, "  li t2, %d\n", ra_offset_tc);
+                            fprintf(out, "  add t2, sp, t2\n");
+                            fprintf(out, "  ld ra, 0(t2)\n");
+                        }
+                        int s0_offset_tc = frame_size - 16;
+                        if (s0_offset_tc >= -2048 && s0_offset_tc <= 2047) {
+                            fprintf(out, "  ld s0, %d(sp)\n", s0_offset_tc);
+                        } else {
+                            fprintf(out, "  li t2, %d\n", s0_offset_tc);
+                            fprintf(out, "  add t2, sp, t2\n");
+                            fprintf(out, "  ld s0, 0(t2)\n");
+                        }
+                        if (frame_size >= -2048 && frame_size <= 2047) {
+                            fprintf(out, "  addi sp, sp, %d\n", frame_size);
+                        } else {
+                            fprintf(out, "  li t2, %d\n", frame_size);
+                            fprintf(out, "  add sp, sp, t2\n");
+                        }
                         fprintf(out, "  j %s\n", instr->call_fn);
                         param_idx = 0;
                         skip_return = 1;
@@ -618,11 +712,35 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
         /* --- Centralized Epilogue --- */
         fprintf(out, "\n%s:\n", exit_label);
         fprintf(out, "  # --- Epilogue ---\n");
-        fprintf(out, "  addi sp, s0, -%d\n", frame_size);
+        if (frame_size >= -2048 && frame_size <= 2047) {
+            fprintf(out, "  addi sp, s0, -%d\n", frame_size);
+        } else {
+            fprintf(out, "  li t2, %d\n", -frame_size);
+            fprintf(out, "  add sp, s0, t2\n");
+        }
         emit_callee_restores(out, cur_ra, frame_size);
-        fprintf(out, "  ld ra, %d(sp)\n", frame_size - 8);
-        fprintf(out, "  ld s0, %d(sp)\n", frame_size - 16);
-        fprintf(out, "  addi sp, sp, %d\n", frame_size);
+        int ra_offset_ep = frame_size - 8;
+        if (ra_offset_ep >= -2048 && ra_offset_ep <= 2047) {
+            fprintf(out, "  ld ra, %d(sp)\n", ra_offset_ep);
+        } else {
+            fprintf(out, "  li t2, %d\n", ra_offset_ep);
+            fprintf(out, "  add t2, sp, t2\n");
+            fprintf(out, "  ld ra, 0(t2)\n");
+        }
+        int s0_offset_ep = frame_size - 16;
+        if (s0_offset_ep >= -2048 && s0_offset_ep <= 2047) {
+            fprintf(out, "  ld s0, %d(sp)\n", s0_offset_ep);
+        } else {
+            fprintf(out, "  li t2, %d\n", s0_offset_ep);
+            fprintf(out, "  add t2, sp, t2\n");
+            fprintf(out, "  ld s0, 0(t2)\n");
+        }
+        if (frame_size >= -2048 && frame_size <= 2047) {
+            fprintf(out, "  addi sp, sp, %d\n", frame_size);
+        } else {
+            fprintf(out, "  li t2, %d\n", frame_size);
+            fprintf(out, "  add sp, sp, t2\n");
+        }
         fprintf(out, "  jr ra\n\n");
 
         func = func->next;

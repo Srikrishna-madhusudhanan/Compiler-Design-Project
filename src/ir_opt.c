@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "ir_opt.h"
 #include "compiler_metrics.h"
 #include "y.tab.h"
@@ -1436,27 +1437,75 @@ static void rename_block(BasicBlock *bb, CFG *cfg, RenameState *rs, VarEntry *va
         IRInstr *phi = succ->instrs;
         /* Skip initial label if present */
         if (phi && phi->kind == IR_LABEL) phi = phi->next;
+        
+        /* Step 2.2: Detect backedges
+         * A backedge occurs when successor has already been visited (phis are already SSA-renamed).
+         * Backedge phis have phi->result with .N suffix already (e.g., sum.7).
+         * For backedges, we should use the current renamed state for this block. */
+        /* TODO: Use is_backedge for improved backedge handling */
+        /* int is_backedge = 0;
+        if (phi && phi->kind == IR_PHI) {
+            if (phi->result && strchr(phi->result, '.')) {
+                is_backedge = 1;
+            }
+        } */
+        
         while (phi && phi->kind == IR_PHI) {
             /* Find which slot in phi corresponds to `bb` */
             for (int k = 0; k < phi->phi_arity; k++) {
                 if (phi->phi_pred_bb[k] == bb->id) {
-                    /* phi->result holds the *original* var name at insert time
-                     * but after we renamed the definition in `bb`, the top of
-                     * stack for the original name is what flows into the phi. */
-                    /* We need the original variable name for this phi.
-                     * If the successor block was already visited (e.g. backedge),
-                     * phi->result is already renamed (e.g. sum$7.1). We must strip
-                     * the suffix to find the base variable name. */
+                    /* Step 2.1: Improved base name recovery
+                     * phi->result holds the destination SSA name.
+                     * If successor was already visited (backedge), phi->result is already 
+                     * SSA-renamed (e.g., sum.7). We must strip the .N suffix to find the 
+                     * base variable name. */
+                    
+                    assert(phi->result != NULL && strlen(phi->result) > 0);
+                    
                     char orig_var[128];
                     strncpy(orig_var, phi->result, sizeof(orig_var) - 1);
                     orig_var[sizeof(orig_var) - 1] = '\0';
+                    
+                    /* Strip .N suffix if present (validate format) */
                     char *dot = strchr(orig_var, '.');
-                    if (dot) *dot = '\0';
+                    if (dot) {
+                        *dot = '\0';  /* Strip .N suffix */
+                    }
 
                     const char *top = rs_top(rs, orig_var);
+                    
+                    /* Step 2.1: Fallback handling - if stack lookup fails, use full phi->result */
+                    if (!top) {
+                        fprintf(stderr, "WARNING: Stack lookup failed for base var '%s' (from phi->result='%s'); using full phi->result as fallback\n",
+                                orig_var, phi->result);
+                        top = phi->result;
+                    }
+
                     if (phi->phi_args[k]) free(phi->phi_args[k]);
                     phi->phi_args[k] = strdup(top);
+                    
                     break;
+                }
+            }
+            if (phi == succ->last) break;
+            phi = phi->next;
+        }
+    }
+
+    /* Step 1.2: Track phi argument filling for debugging
+     * After filling phi args for all successors, check if any are still NULL.
+     * This helps catch incomplete phi filling due to traversal order issues. */
+    for (int si = 0; si < bb->succ_count; si++) {
+        BasicBlock *succ = bb->succs[si];
+        IRInstr *phi = succ->instrs;
+        if (phi && phi->kind == IR_LABEL) phi = phi->next;
+        
+        while (phi && phi->kind == IR_PHI) {
+            for (int k = 0; k < phi->phi_arity; k++) {
+                if (phi->phi_pred_bb[k] == bb->id && !phi->phi_args[k]) {
+                    /* This should not happen if rename is correct, but log for debugging */
+                    fprintf(stderr, "WARNING: Phi in block %d (var '%s') has NULL incoming from block %d\n",
+                            succ->id, phi->result ? phi->result : "<unknown>", bb->id);
                 }
             }
             if (phi == succ->last) break;
@@ -1492,6 +1541,9 @@ static void rename_variables(CFG *cfg, VarEntry *vars) {
 
 /* --- Public SSA API --- */
 
+/* Forward declarations for phase 1 validation */
+static int validate_phi_args(CFG *cfg);
+
 void ssa_construct(CFG *cfg) {
     if (!cfg || !cfg->entry) return;
 
@@ -1503,6 +1555,13 @@ void ssa_construct(CFG *cfg) {
 
     insert_phi_functions(cfg, vars);
     rename_variables(cfg, vars);
+
+    /* Step 1.1: Validate that all phi arguments were properly filled */
+    if (validate_phi_args(cfg)) {
+        fprintf(stderr, "SSA construction failed: incomplete phi arguments detected\n");
+        varlist_free(vars);
+        return;
+    }
 
     varlist_free(vars);
 }
@@ -1576,6 +1635,100 @@ static void insert_copy_before_terminator(BasicBlock *pred_bb,
     copy->next = term;
 }
 
+/* ========================================================================== */
+/* Phase 4: Parallel Copy Semantics via Temporary Variables */
+/* ========================================================================== */
+
+/**
+ * gen_phi_temp_for_var: Generate a unique temporary variable name for a specific phi result.
+ * This ensures uniqueness by using the phi's destination variable name.
+ */
+static char *gen_phi_temp_for_var(const char *phi_result, int arg_index) {
+    static char buf[128];
+    if (phi_result) {
+        snprintf(buf, sizeof(buf), "__phi_tmp_%s_%d", phi_result, arg_index);
+    } else {
+        snprintf(buf, sizeof(buf), "__phi_tmp_arg_%d", arg_index);
+    }
+    return buf;
+}
+
+/* ========================================================================== */
+/* Phase 1: Validation Infrastructure */
+/* ========================================================================== */
+
+/**
+ * validate_phi_args: Check that all phi arguments are properly filled.
+ *   Returns 0 if all phis are valid, 1 if any phi has unfilled arguments.
+ *   Logs detailed error information for debugging.
+ */
+static int validate_phi_args(CFG *cfg) {
+    int has_errors = 0;
+
+    if (!cfg) return 0;
+
+    BasicBlock *bb = cfg->blocks;
+    while (bb) {
+        IRInstr *ins = bb->instrs;
+        /* Skip optional leading label */
+        if (ins && ins->kind == IR_LABEL) ins = ins->next;
+
+        while (ins && ins->kind == IR_PHI) {
+            IRInstr *phi = ins;
+
+            /* Check that arity matches predecessor count */
+            if (phi->phi_arity != bb->pred_count) {
+                fprintf(stderr, "ERROR: Phi in block %d has arity %d but block has %d predecessors\n",
+                        bb->id, phi->phi_arity, bb->pred_count);
+                has_errors = 1;
+            }
+
+            /* Check that all phi_args are non-NULL */
+            for (int k = 0; k < phi->phi_arity; k++) {
+                if (!phi->phi_args[k]) {
+                    fprintf(stderr, "ERROR: Phi in block %d for variable '%s' has NULL incoming value from predecessor %d\n",
+                            bb->id, phi->result ? phi->result : "<unknown>", phi->phi_pred_bb[k]);
+                    has_errors = 1;
+                }
+
+                /* Verify predecessor block ID is valid */
+                int found = 0;
+                for (int p = 0; p < bb->pred_count; p++) {
+                    if (bb->preds[p] && bb->preds[p]->id == phi->phi_pred_bb[k]) {
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) {
+                    fprintf(stderr, "ERROR: Phi in block %d references unknown predecessor block ID %d\n",
+                            bb->id, phi->phi_pred_bb[k]);
+                    has_errors = 1;
+                }
+            }
+
+            if (phi == bb->last) break;
+            ins = ins->next;
+        }
+
+        bb = bb->next;
+    }
+
+    return has_errors;
+}
+
+static int has_cycle(int u, int graph[100][100], int visited[100], int rec[100], int count) {
+    visited[u] = 1;
+    rec[u] = 1;
+    for (int v = 0; v < count; v++) {
+        if (graph[u][v]) {
+            if (!visited[v] && has_cycle(v, graph, visited, rec, count)) return 1;
+            else if (rec[v]) return 1;
+        }
+    }
+    rec[u] = 0;
+    return 0;
+}
+
 void ssa_destruct(CFG *cfg) {
     if (!cfg) return;
 
@@ -1588,24 +1741,93 @@ void ssa_destruct(CFG *cfg) {
         if (scan_start && scan_start->kind == IR_LABEL)
             scan_start = scan_start->next;
 
-        while (scan_start && scan_start->kind == IR_PHI) {
-            IRInstr *phi = scan_start;
-            scan_start = scan_start->next;
+        /* Collect all phi instructions in this block */
+        IRInstr *phis[100];
+        int phi_count = 0;
+        IRInstr *scan = scan_start;
+        while (scan && scan->kind == IR_PHI) {
+            phis[phi_count++] = scan;
+            scan = scan->next;
+        }
 
-            /* For each predecessor, insert a copy */
-            for (int k = 0; k < phi->phi_arity; k++) {
-                /* Find predecessor block */
-                BasicBlock *pred = NULL;
-                for (int p = 0; p < bb->pred_count; p++) {
-                    if (bb->preds[p]->id == phi->phi_pred_bb[k]) {
-                        pred = bb->preds[p];
-                        break;
+        /* Build dependency graph for cycle detection */
+        int graph[100][100] = {0};
+        char *phi_results[100];
+        for (int i = 0; i < phi_count; i++) {
+            phi_results[i] = phis[i]->result;
+        }
+        for (int i = 0; i < phi_count; i++) {
+            for (int k = 0; k < phis[i]->phi_arity; k++) {
+                char *arg = phis[i]->phi_args[k];
+                for (int j = 0; j < phi_count; j++) {
+                    if (strcmp(arg, phi_results[j]) == 0) {
+                        graph[i][j] = 1; /* i depends on j */
                     }
                 }
-                if (!pred) continue;
-                if (!phi->phi_args[k]) continue;   /* undef — skip */
+            }
+        }
 
-                insert_copy_before_terminator(pred, phi->result, phi->phi_args[k]);
+        /* Detect cycles using DFS */
+        int visited[100] = {0}, rec[100] = {0};
+        int cycle = 0;
+        for (int i = 0; i < phi_count; i++) {
+            if (!visited[i] && has_cycle(i, graph, visited, rec, phi_count)) {
+                cycle = 1;
+                break;
+            }
+        }
+
+        if (!cycle) {
+            /* Single phase: direct assignment */
+            for (int i = 0; i < phi_count; i++) {
+                IRInstr *phi = phis[i];
+                for (int k = 0; k < phi->phi_arity; k++) {
+                    BasicBlock *pred = NULL;
+                    for (int p = 0; p < bb->pred_count; p++) {
+                        if (bb->preds[p]->id == phi->phi_pred_bb[k]) {
+                            pred = bb->preds[p];
+                            break;
+                        }
+                    }
+                    if (!pred || !phi->phi_args[k]) continue;
+                    insert_copy_before_terminator(pred, phi->result, phi->phi_args[k]);
+                }
+            }
+        } else {
+            /* Two-phase: use temps to handle cycles */
+            for (int i = 0; i < phi_count; i++) {
+                IRInstr *phi = phis[i];
+                for (int k = 0; k < phi->phi_arity; k++) {
+                    BasicBlock *pred = NULL;
+                    for (int p = 0; p < bb->pred_count; p++) {
+                        if (bb->preds[p]->id == phi->phi_pred_bb[k]) {
+                            pred = bb->preds[p];
+                            break;
+                        }
+                    }
+                    if (!pred || !phi->phi_args[k]) continue;
+                    char *temp_var = gen_phi_temp_for_var(phi->result, k);
+                    if (strcmp(phi->phi_args[k], temp_var) != 0) {
+                        insert_copy_before_terminator(pred, temp_var, phi->phi_args[k]);
+                    }
+                }
+            }
+            for (int i = 0; i < phi_count; i++) {
+                IRInstr *phi = phis[i];
+                for (int k = 0; k < phi->phi_arity; k++) {
+                    BasicBlock *pred = NULL;
+                    for (int p = 0; p < bb->pred_count; p++) {
+                        if (bb->preds[p]->id == phi->phi_pred_bb[k]) {
+                            pred = bb->preds[p];
+                            break;
+                        }
+                    }
+                    if (!pred || !phi->phi_args[k]) continue;
+                    char *temp_var = gen_phi_temp_for_var(phi->result, k);
+                    if (strcmp(phi->result, temp_var) != 0) {
+                        insert_copy_before_terminator(pred, phi->result, temp_var);
+                    }
+                }
             }
         }
 
