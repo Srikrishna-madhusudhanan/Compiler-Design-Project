@@ -3113,18 +3113,6 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
             mark_reachable_and_cleanup(cfg);
 
             if (level >= OPT_O2) {
-                /* --- SSA round-trip (Phase 1-3) ---
-                 * Dominators must be computed before constructing SSA because
-                 * both dominance frontiers and dominator-tree renaming rely on them.
-                 * After all SSA-based passes (currently none), destruct back to
-                 * conventional 3-address IR before the loop passes run.
-                 */
-                compute_dominators(cfg);
-                ssa_construct(cfg);
-                /* <-- Future SSA-based passes go here (SCCP, GVN, SSA-DCE, ...) */
-                ssa_destruct(cfg);
-
-                induction_variable_elimination(cfg);
                 optimize_loops(cfg);
                 unroll_loops(cfg);
 
