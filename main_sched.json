@@ -4,30 +4,17 @@
     {
       "id": 1,
       "nodes": [
-        {"id": 0, "label": "  *q$12 = 1", "priority": 7},
-        {"id": 1, "label": "q$12[1] = 2", "priority": 6},
-        {"id": 2, "label": "  t0.0 = *q$12", "priority": 5},
-        {"id": 3, "label": "  t1.0 = q$12[1]", "priority": 5},
-        {"id": 4, "label": "  t2.0 := t0.0 + t1.0", "priority": 2},
-        {"id": 5, "label": "  if t2.0 == 3 goto L2", "priority": 1}
+        {"id": 0, "label": "  sum$4 := 0", "priority": 1},
+        {"id": 1, "label": "  i$5 := 0", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 5},
-        {"from": 0, "to": 1},
-        {"from": 1, "to": 5},
-        {"from": 1, "to": 3},
-        {"from": 1, "to": 2},
-        {"from": 2, "to": 5},
-        {"from": 2, "to": 4},
-        {"from": 3, "to": 5},
-        {"from": 3, "to": 4},
-        {"from": 4, "to": 5}
+
       ]
     },
     {
       "id": 2,
       "nodes": [
-        {"id": 0, "label": "  return 0", "priority": 1}
+        {"id": 0, "label": "  if i$5 < 6 goto L1", "priority": 1}
       ],
       "edges": [
 
@@ -36,10 +23,83 @@
     {
       "id": 3,
       "nodes": [
-        {"id": 0, "label": "  return 1", "priority": 1}
+        {"id": 0, "label": "  goto L2", "priority": 1}
       ],
       "edges": [
 
+      ]
+    },
+    {
+      "id": 4,
+      "nodes": [
+        {"id": 0, "label": "  t0 := i$5 % 2", "priority": 2},
+        {"id": 1, "label": "  if t0 == 0 goto L3", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 1}
+      ]
+    },
+    {
+      "id": 5,
+      "nodes": [
+        {"id": 0, "label": "  goto L4", "priority": 1}
+      ],
+      "edges": [
+
+      ]
+    },
+    {
+      "id": 6,
+      "nodes": [
+        {"id": 0, "label": "  t1 := sum$4 + i$5", "priority": 3},
+        {"id": 1, "label": "  sum$4 := t1", "priority": 2},
+        {"id": 2, "label": "  goto L5", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 2},
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 2}
+      ]
+    },
+    {
+      "id": 7,
+      "nodes": [
+        {"id": 0, "label": "  t2 := i$5 + i$5", "priority": 3},
+        {"id": 1, "label": "  t3 := sum$4 + t2", "priority": 2},
+        {"id": 2, "label": "  sum$4 := t3", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 2}
+      ]
+    },
+    {
+      "id": 8,
+      "nodes": [
+        {"id": 0, "label": "  t4 := i$5 + 1", "priority": 3},
+        {"id": 1, "label": "  i$5 := t4", "priority": 2},
+        {"id": 2, "label": "  goto L0", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 2},
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 2}
+      ]
+    },
+    {
+      "id": 9,
+      "nodes": [
+        {"id": 0, "label": "  param .LC0", "priority": 4},
+        {"id": 1, "label": "  param sum$4", "priority": 3},
+        {"id": 2, "label": "  call printf, 2", "priority": 2},
+        {"id": 3, "label": "  return 0", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 3},
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 3},
+        {"from": 1, "to": 2},
+        {"from": 2, "to": 3}
       ]
     }
   ]

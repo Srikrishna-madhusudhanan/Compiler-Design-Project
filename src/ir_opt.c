@@ -243,26 +243,9 @@ static IRInstr* simplify_control_flow(IRInstr *head) {
                 }
             }
 
-            if (curr->kind == IR_IF && curr->next && curr->next->kind == IR_GOTO &&
-                curr->next->next && curr->next->next->kind == IR_LABEL &&
-                strcmp(curr->label, curr->next->next->label) == 0) {
-
-                char *target_L2 = curr->next->label;
-                IRRelop neg_rel = negate_relop(curr->relop);
-                IRInstr *goto_instr = curr->next;
-                IRInstr *label_L1 = goto_instr->next;
-
-                free(curr->label);
-                curr->label = target_L2 ? strdup(target_L2) : NULL;
-                curr->relop = neg_rel;
-                curr->next = label_L1;
-
-                goto_instr->label = NULL;
-                goto_instr->next = NULL;
-                free_instr_single(goto_instr);
-                changed = 1;
-                continue;
-            }
+            /* NOTE: Disabled IF-inversion rewrite (if cond goto L1; goto L2; L1: ...)
+             * because it can silently change then/else behavior in non-trivial layouts.
+             * Keep conditional control flow untouched unless proven safe by CFG analysis. */
 
             if (curr->kind == IR_GOTO && curr->next && curr->next->kind == IR_LABEL &&
                 strcmp(curr->label, curr->next->label) == 0) {
@@ -274,7 +257,7 @@ static IRInstr* simplify_control_flow(IRInstr *head) {
                 continue;
             }
 
-            if (curr->kind == IR_GOTO || curr->kind == IR_IF) {
+            if (curr->kind == IR_GOTO) {
                 IRInstr *target = head;
                 while (target) {
                     if (target->kind == IR_LABEL && strcmp(target->label, curr->label) == 0) {
@@ -2604,7 +2587,7 @@ static InductionVar* find_iv(InductionVar *ivs, int count, const char *name) {
 }
 
 
-static void induction_variable_elimination(CFG *cfg) {
+static void __attribute__((unused)) induction_variable_elimination(CFG *cfg) {
     if (!cfg) return;
     compute_dominators(cfg);
 
@@ -3120,11 +3103,15 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
                  * conventional 3-address IR before the loop passes run.
                  */
                 compute_dominators(cfg);
-                ssa_construct(cfg);
+                // ssa_construct(cfg);
                 /* <-- Future SSA-based passes go here (SCCP, GVN, SSA-DCE, ...) */
-                ssa_destruct(cfg);
+                // ssa_destruct(cfg);
 
-                induction_variable_elimination(cfg);
+                /* Temporarily disabled: current IVE can miscompile loops with branches
+                 * by over-aggressively rewriting derived values.
+                 * Re-enable only after dominance/use-safety checks are strengthened.
+                 */
+                // induction_variable_elimination(cfg);
                 optimize_loops(cfg);
                 unroll_loops(cfg);
 

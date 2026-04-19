@@ -4,8 +4,8 @@
     {
       "id": 1,
       "nodes": [
-        {"id": 0, "label": "  t0.0 := a$4 + b$5", "priority": 2},
-        {"id": 1, "label": "  return t0.0", "priority": 1}
+        {"id": 0, "label": "  t0 := a$4 + b$5", "priority": 2},
+        {"id": 1, "label": "  return t0", "priority": 1}
       ],
       "edges": [
         {"from": 0, "to": 1}
