@@ -18,7 +18,8 @@ typedef enum {
     SYM_PARAMETER,
     SYM_CONSTANT,
     SYM_KEYWORD,
-    SYM_STRUCT
+    SYM_STRUCT,
+    SYM_TYPEDEF
 } SymbolKind;
 
 typedef struct Symbol {

@@ -4,6 +4,7 @@
 #include <string.h>
  //#include "tokens.h" //remove this when integrating with parser
 #include "y.tab.h"
+#include "parser_typedefs.h"
  /* ---------- yylval (standalone) ---------- */
  /*
 typedef union {
@@ -50,8 +51,10 @@ const char *token_name(int token) {
         case T_TRY:     return "T_TRY";
         case T_CATCH:   return "T_CATCH";
         case T_THROW:   return "T_THROW";
+        case T_TYPEDEF: return "T_TYPEDEF";
 
         case T_IDENT:   return "T_IDENT";
+        case T_TYPE_NAME:return "T_TYPE_NAME";
         case T_NUMBER:  return "T_NUMBER";
 
         case T_EQ:      return "T_EQ";
@@ -122,6 +125,7 @@ STRING_LITERAL \"([^\\\n]|\\[nt'\"\\])*\"
 "try"       { SAVE_POS(); ADVANCE(); return T_TRY; }
 "catch"     { SAVE_POS(); ADVANCE(); return T_CATCH; }
 "throw"     { SAVE_POS(); ADVANCE(); return T_THROW; }
+"typedef"   { SAVE_POS(); ADVANCE(); return T_TYPEDEF; }
 
  /* ---------- Multi-char operators ---------- */
 "++"        { SAVE_POS(); ADVANCE(); return T_INC; }
@@ -172,6 +176,8 @@ STRING_LITERAL \"([^\\\n]|\\[nt'\"\\])*\"
     SAVE_POS();
     yylval.str = strdup(yytext);
     ADVANCE();
+    if (parser_is_typedef_name(yytext))
+        return T_TYPE_NAME;
     return T_IDENT;
 }
 

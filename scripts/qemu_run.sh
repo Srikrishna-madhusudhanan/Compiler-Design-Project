@@ -68,7 +68,7 @@ fi
 echo "--> Running Parser with flags: ${COMPILER_FLAGS[*]:-<none>}"
 # FIX 2: Use array expansion "${COMPILER_FLAGS[@]}" so flags with spaces
 #        are passed as separate arguments, not a single glob-split string.
-"$PARSER" "${COMPILER_FLAGS[@]}" "$SRC_FILE" > /dev/null
+"$PARSER" "${COMPILER_FLAGS[@]}" "$SRC_FILE"
 
 # FIX 3: Verify output.s was actually produced by the parser before linking.
 #        Without this check, a stale output.s from a prior run gets linked

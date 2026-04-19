@@ -99,6 +99,7 @@ typedef struct ASTNode {
     int is_constructor;
     int is_destructor;
     int is_const;          // const qualifier
+    int is_typedef;        // typedef alias declaration
     struct Symbol *sym;    // Resolved symbol for variables
 } ASTNode;
 

@@ -4,7 +4,7 @@
     {
       "id": 1,
       "nodes": [
-        {"id": 0, "label": "  y$5.0 := 0", "priority": 2},
+        {"id": 0, "label": "  y$5 := 0", "priority": 2},
         {"id": 1, "label": "  if x$4 == 0 goto L0", "priority": 1}
       ],
       "edges": [
@@ -23,11 +23,10 @@
     {
       "id": 3,
       "nodes": [
-        {"id": 0, "label": "  y$5.3 := y$5.0", "priority": 2},
-        {"id": 1, "label": "  if x$4 == 2 goto L2", "priority": 1}
+        {"id": 0, "label": "  if x$4 == 2 goto L2", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 1}
+
       ]
     },
     {
@@ -42,62 +41,48 @@
     {
       "id": 5,
       "nodes": [
-        {"id": 0, "label": "  y$5.5 := 100", "priority": 3},
-        {"id": 1, "label": "  y$5.6 := y$5.5", "priority": 2},
-        {"id": 2, "label": "  t0.1 := t0", "priority": 2},
-        {"id": 3, "label": "  goto L4", "priority": 1}
+        {"id": 0, "label": "  y$5 := 100", "priority": 2},
+        {"id": 1, "label": "  goto L4", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 3},
-        {"from": 0, "to": 1},
-        {"from": 1, "to": 3},
-        {"from": 2, "to": 3}
+        {"from": 0, "to": 1}
       ]
     },
     {
       "id": 6,
       "nodes": [
-        {"id": 0, "label": "  y$5.2 := 200", "priority": 2},
-        {"id": 1, "label": "  y$5.3 := y$5.2", "priority": 1}
+        {"id": 0, "label": "  y$5 := 200", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 1}
+
       ]
     },
     {
       "id": 7,
       "nodes": [
-        {"id": 0, "label": "  t0.0 := y$5.3 + 1", "priority": 4},
-        {"id": 1, "label": "  y$5.4 := t0.0", "priority": 3},
-        {"id": 2, "label": "  y$5.6 := y$5.4", "priority": 2},
-        {"id": 3, "label": "  t0.1 := t0.0", "priority": 2},
-        {"id": 4, "label": "  goto L4", "priority": 1}
+        {"id": 0, "label": "  t0 := y$5 + 1", "priority": 3},
+        {"id": 1, "label": "  y$5 := t0", "priority": 2},
+        {"id": 2, "label": "  goto L4", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 4},
-        {"from": 0, "to": 3},
+        {"from": 0, "to": 2},
         {"from": 0, "to": 1},
-        {"from": 1, "to": 4},
-        {"from": 1, "to": 2},
-        {"from": 2, "to": 4},
-        {"from": 3, "to": 4}
+        {"from": 1, "to": 2}
       ]
     },
     {
       "id": 8,
       "nodes": [
-        {"id": 0, "label": "  y$5.1 := -1", "priority": 2},
-        {"id": 1, "label": "  y$5.6 := y$5.1", "priority": 1},
-        {"id": 2, "label": "  t0.1 := t0", "priority": 1}
+        {"id": 0, "label": "  y$5 := -1", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 1}
+
       ]
     },
     {
       "id": 9,
       "nodes": [
-        {"id": 0, "label": "  return y$5.6", "priority": 1}
+        {"id": 0, "label": "  return y$5", "priority": 1}
       ],
       "edges": [
 

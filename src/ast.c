@@ -240,6 +240,7 @@ ASTNode* create_node(NodeType type) {
     node->sym = NULL;
     node->inheritance_modifier = 0;
     node->is_const = 0;
+    node->is_typedef = 0;
     return node;
 }
 

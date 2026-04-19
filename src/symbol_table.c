@@ -286,6 +286,7 @@ const char* symbol_kind_to_string(SymbolKind kind) {
         case SYM_CONSTANT:  return "constant";
         case SYM_KEYWORD:   return "keyword";
         case SYM_STRUCT:    return "struct";
+        case SYM_TYPEDEF:   return "typedef";
         default:            return "unknown";
     }
 }

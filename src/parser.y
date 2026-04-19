@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "ast.h"
+#include "parser_typedefs.h"
 #include "symbol_table.h"
 #include "semantic.h"
 #include "ir_gen.h"
@@ -48,6 +50,87 @@ void yyerror(const char *s);
 
 // Global Root
 ASTNode *root = NULL;
+
+static void register_typedef_declarator_list(ASTNode *list) {
+    for (ASTNode *n = list; n; n = n->next) {
+        if (n->str_val && *n->str_val) {
+            parser_register_typedef_name(n->str_val);
+        }
+    }
+}
+
+static int min3(int a, int b, int c) {
+    int m = (a < b) ? a : b;
+    return (m < c) ? m : c;
+}
+
+static int edit_distance_ci(const char *a, const char *b) {
+    int la = (int)strlen(a);
+    int lb = (int)strlen(b);
+    int *dp = (int*)malloc(sizeof(int) * (lb + 1));
+    if (!dp) return 999;
+
+    for (int j = 0; j <= lb; ++j) dp[j] = j;
+    for (int i = 1; i <= la; ++i) {
+        int prev = dp[0];
+        dp[0] = i;
+        for (int j = 1; j <= lb; ++j) {
+            int old = dp[j];
+            int ca = tolower((unsigned char)a[i - 1]);
+            int cb = tolower((unsigned char)b[j - 1]);
+            int cost = (ca == cb) ? 0 : 1;
+            dp[j] = min3(dp[j] + 1, dp[j - 1] + 1, prev + cost);
+            prev = old;
+        }
+    }
+
+    int dist = dp[lb];
+    free(dp);
+    return dist;
+}
+
+static int is_identifier_text(const char *s) {
+    if (!s || !*s) return 0;
+    if (!(isalpha((unsigned char)s[0]) || s[0] == '_')) return 0;
+    for (int i = 1; s[i]; ++i) {
+        if (!(isalnum((unsigned char)s[i]) || s[i] == '_')) return 0;
+    }
+    return 1;
+}
+
+static const char *closest_keyword(const char *tok, int *out_dist) {
+    static const char *kws[] = {
+        "int", "char", "void", "const", "typedef", "struct", "class", "virtual",
+        "public", "private", "if", "else", "while", "for", "return", "switch",
+        "case", "default", "break", "continue", "printf", "scanf", "new", "delete",
+        "try", "catch", "throw", NULL
+    };
+
+    const char *best = NULL;
+    int best_dist = 999;
+    for (int i = 0; kws[i]; ++i) {
+        int d = edit_distance_ci(tok, kws[i]);
+        if (d < best_dist) {
+            best_dist = d;
+            best = kws[i];
+        }
+    }
+    if (out_dist) *out_dist = best_dist;
+    return best;
+}
+
+static int token_can_start_statement(const char *tok) {
+    if (!tok || !*tok) return 0;
+    static const char *starters[] = {
+        "int", "char", "void", "const", "typedef", "if", "while", "for", "return",
+        "switch", "break", "continue", "printf", "scanf", "try", "throw", "}",
+        "else", "case", "default", NULL
+    };
+    for (int i = 0; starters[i]; ++i) {
+        if (strcmp(tok, starters[i]) == 0) return 1;
+    }
+    return 0;
+}
 %}
 
 %union {
@@ -58,8 +141,8 @@ ASTNode *root = NULL;
 
 /* Tokens */
 %token <intval> T_INT T_VOID T_CHAR T_STRUCT T_VIRTUAL T_CLASS T_PUBLIC T_PRIVATE T_COLON
-%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST T_TRY T_CATCH T_THROW T_NEW T_DELETE
-%token <str>    T_IDENT T_STRING_LIT
+%token <intval> T_IF T_ELSE T_WHILE T_FOR T_RETURN T_SWITCH T_CASE T_DEFAULT T_BREAK T_CONTINUE T_PRINTF T_SCANF T_CONST T_TRY T_CATCH T_THROW T_NEW T_DELETE T_TYPEDEF
+%token <str>    T_IDENT T_TYPE_NAME T_STRING_LIT
 %token <intval> T_NUMBER T_CHAR_LIT
 %token <intval> T_ARROW T_TILDE
 
@@ -231,6 +314,69 @@ declaration
             $$ = $3;
         }
     }
+    | T_TYPEDEF type_specifier declarator_list ';' {
+        ASTNode *result = NULL;
+        ASTNode *type_node = NULL;
+
+        if ($2->type == NODE_STRUCT_DEF) {
+            result = $2;
+            type_node = create_type_node(T_STRUCT);
+            type_node->str_val = strdup($2->str_val);
+            type_node->left = $2;
+        } else {
+            type_node = $2;
+        }
+
+        ASTNode *temp = $3;
+        while(temp) {
+            temp->left = type_node;
+            temp->is_typedef = 1;
+            if (type_node->type == NODE_TYPE && type_node->int_val == T_STRUCT) {
+                if (!temp->left->str_val && type_node->str_val)
+                    temp->left->str_val = strdup(type_node->str_val);
+            }
+            temp = temp->next;
+        }
+
+        if (result) {
+            $$ = append_node(result, $3);
+        } else {
+            $$ = $3;
+        }
+        register_typedef_declarator_list($3);
+    }
+    | T_TYPEDEF T_CONST type_specifier declarator_list ';' {
+        ASTNode *result = NULL;
+        ASTNode *type_node = NULL;
+
+        if ($3->type == NODE_STRUCT_DEF) {
+            result = $3;
+            type_node = create_type_node(T_STRUCT);
+            type_node->str_val = strdup($3->str_val);
+            type_node->left = $3;
+        } else {
+            type_node = $3;
+        }
+
+        ASTNode *temp = $4;
+        while(temp) {
+            temp->left = type_node;
+            temp->is_typedef = 1;
+            temp->is_const = 1;
+            if (type_node->type == NODE_TYPE && type_node->int_val == T_STRUCT) {
+                if (!temp->left->str_val && type_node->str_val)
+                    temp->left->str_val = strdup(type_node->str_val);
+            }
+            temp = temp->next;
+        }
+
+        if (result) {
+            $$ = append_node(result, $4);
+        } else {
+            $$ = $4;
+        }
+        register_typedef_declarator_list($4);
+    }
     | type_specifier declarator_list error {
         yyerrok;
         $$ = $2;
@@ -313,10 +459,10 @@ type_specifier: T_INT { $$ = create_type_node(T_INT); }
                | T_VOID { $$ = create_type_node(T_VOID); }
                | struct_specifier { $$ = $1; }
                | class_specifier { $$ = $1; }
-               | T_IDENT { 
+               | T_TYPE_NAME {
                    $$ = create_node(NODE_TYPE); 
-                   $$->str_val = strdup($1); 
-                   $$->data_type = TYPE_STRUCT; 
+                   $$->str_val = strdup($1);
+                   $$->data_type = TYPE_STRUCT;
                    SET_LINE($$);
                }
                ;
@@ -860,6 +1006,19 @@ int parse_errors = 0;
 
 void yyerror(const char *s) {
     fprintf(stderr, "Parser Error: %s at line %d, column %d (token: %s)\n", s, line_num, col_num, yytext);
+
+    if (token_can_start_statement(yytext)) {
+        fprintf(stderr, "Hint: it looks like you may have forgotten a semicolon before '%s'.\n", yytext);
+    }
+
+    if (is_identifier_text(yytext)) {
+        int dist = 999;
+        const char *kw = closest_keyword(yytext, &dist);
+        if (kw && dist > 0 && dist <= 2) {
+            fprintf(stderr, "Hint: '%s' looks similar to keyword '%s'.\n", yytext, kw);
+        }
+    }
+
     parse_errors++;
 }
 
@@ -906,6 +1065,7 @@ int main(int argc, char **argv) {
     }
 
     printf("Parsing...\n");
+    parser_clear_typedef_names();
     int parse_result = yyparse();
 
     if(parse_result == 0 && parse_errors == 0 && root != NULL){
@@ -990,9 +1150,11 @@ int main(int argc, char **argv) {
             export_ast_to_dot(root, "ast.dot");
             export_ast_to_json(root, "ast.json");
         }
+        parser_clear_typedef_names();
         return 0;
     } else {
         printf("Parsing Failed\n");
+        parser_clear_typedef_names();
         return 1;
      }
 }

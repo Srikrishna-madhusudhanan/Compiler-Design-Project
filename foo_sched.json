@@ -4,7 +4,7 @@
     {
       "id": 1,
       "nodes": [
-        {"id": 0, "label": "  if x$4 >= y$5 goto L2", "priority": 1}
+        {"id": 0, "label": "  if x$4 < y$5 goto L1", "priority": 1}
       ],
       "edges": [
 
@@ -13,84 +13,41 @@
     {
       "id": 2,
       "nodes": [
-        {"id": 0, "label": "  t0.0 := x$4 + 1", "priority": 3},
-        {"id": 1, "label": "  x$4.0 := t0.0", "priority": 2},
-        {"id": 2, "label": "  goto L0", "priority": 1}
+        {"id": 0, "label": "  goto L2", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 2},
-        {"from": 0, "to": 1},
-        {"from": 1, "to": 2}
+
       ]
     },
     {
       "id": 3,
       "nodes": [
-        {"id": 0, "label": "  i$6.0 := 0", "priority": 2},
-        {"id": 1, "label": "  i$6.1 := i$6.0", "priority": 1},
-        {"id": 2, "label": "  t1.0 := t1", "priority": 1},
-        {"id": 3, "label": "  t2.0 := t2", "priority": 1}
+        {"id": 0, "label": "  t0 := x$4 + 1", "priority": 5},
+        {"id": 1, "label": "  t1 := t0 + 12", "priority": 4},
+        {"id": 2, "label": "  param .LC0", "priority": 4},
+        {"id": 3, "label": "  param t1", "priority": 3},
+        {"id": 4, "label": "  x$4 := t0", "priority": 2},
+        {"id": 5, "label": "  call printf, 2", "priority": 2},
+        {"id": 6, "label": "  goto L0", "priority": 1}
       ],
       "edges": [
-        {"from": 0, "to": 1}
+        {"from": 0, "to": 6},
+        {"from": 0, "to": 4},
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 6},
+        {"from": 1, "to": 3},
+        {"from": 2, "to": 6},
+        {"from": 2, "to": 3},
+        {"from": 3, "to": 6},
+        {"from": 3, "to": 5},
+        {"from": 4, "to": 6},
+        {"from": 5, "to": 6}
       ]
     },
     {
       "id": 4,
       "nodes": [
-        {"id": 0, "label": "  t1.2 := t1.0", "priority": 2},
-        {"id": 1, "label": "  if i$6.1 >= 5 goto L6", "priority": 1}
-      ],
-      "edges": [
-        {"from": 0, "to": 1}
-      ]
-    },
-    {
-      "id": 5,
-      "nodes": [
-        {"id": 0, "label": "  t1.1 := i$6.1 + i$6.1", "priority": 2},
-        {"id": 1, "label": "  if t1.1 <= 5 goto L9", "priority": 1}
-      ],
-      "edges": [
-        {"from": 0, "to": 1}
-      ]
-    },
-    {
-      "id": 6,
-      "nodes": [
-        {"id": 0, "label": "  t1.2 := t1.1", "priority": 2},
-        {"id": 1, "label": "  goto L6", "priority": 1}
-      ],
-      "edges": [
-        {"from": 0, "to": 1}
-      ]
-    },
-    {
-      "id": 7,
-      "nodes": [
-        {"id": 0, "label": "  t2.1 := i$6.1 + 1", "priority": 4},
-        {"id": 1, "label": "  i$6.2 := t2.1", "priority": 3},
-        {"id": 2, "label": "  i$6.1 := i$6.2", "priority": 2},
-        {"id": 3, "label": "  t1.0 := t1.1", "priority": 2},
-        {"id": 4, "label": "  t2.0 := t2.1", "priority": 2},
-        {"id": 5, "label": "  goto L3", "priority": 1}
-      ],
-      "edges": [
-        {"from": 0, "to": 5},
-        {"from": 0, "to": 4},
-        {"from": 0, "to": 2},
-        {"from": 0, "to": 1},
-        {"from": 1, "to": 5},
-        {"from": 1, "to": 2},
-        {"from": 2, "to": 5},
-        {"from": 3, "to": 5},
-        {"from": 4, "to": 5}
-      ]
-    },
-    {
-      "id": 8,
-      "nodes": [
-        {"id": 0, "label": "  return z$8", "priority": 1}
+        {"id": 0, "label": "  return x$4", "priority": 1}
       ],
       "edges": [
 
