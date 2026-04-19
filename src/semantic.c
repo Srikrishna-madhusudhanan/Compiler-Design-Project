@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "symbol_table.h"
 #include "ast.h"
 #include "semantic.h"
@@ -16,6 +17,128 @@ static int current_local_offset = 0;
 int get_type_size(DataType t, int pointer_level, Symbol *struct_def);
 
 static Symbol *current_class = NULL;
+
+static int min3(int a, int b, int c) {
+    int m = (a < b) ? a : b;
+    return (m < c) ? m : c;
+}
+
+static int edit_distance_ci(const char *a, const char *b) {
+    int la = (int)strlen(a);
+    int lb = (int)strlen(b);
+    int *dp = (int*)malloc(sizeof(int) * (lb + 1));
+    if (!dp) return 999;
+
+    for (int j = 0; j <= lb; ++j) dp[j] = j;
+
+    for (int i = 1; i <= la; ++i) {
+        int prev = dp[0];
+        dp[0] = i;
+        for (int j = 1; j <= lb; ++j) {
+            int old = dp[j];
+            int ca = tolower((unsigned char)a[i - 1]);
+            int cb = tolower((unsigned char)b[j - 1]);
+            int cost = (ca == cb) ? 0 : 1;
+            dp[j] = min3(dp[j] + 1, dp[j - 1] + 1, prev + cost);
+            prev = old;
+        }
+    }
+
+    int dist = dp[lb];
+    free(dp);
+    return dist;
+}
+
+static Symbol *find_closest_symbol_in_scope_chain(const char *name, SymbolKind kind, int *out_dist) {
+    Symbol *best = NULL;
+    int best_dist = 999;
+    for (Scope *scope = current_scope; scope; scope = scope->parent) {
+        for (int i = 0; i < TABLE_SIZE; ++i) {
+            for (Symbol *sym = scope->table[i]; sym; sym = sym->next) {
+                if (kind != (SymbolKind)-1 && sym->kind != kind) continue;
+                int d = edit_distance_ci(name, sym->name);
+                if (d < best_dist) {
+                    best_dist = d;
+                    best = sym;
+                }
+            }
+        }
+    }
+    if (out_dist) *out_dist = best_dist;
+    return best;
+}
+
+static const char *find_closest_builtin_name(const char *name, int *out_dist) {
+    static const char *builtins[] = {
+        "printf", "scanf", "malloc", "free", "NULL",
+        "int", "char", "void", "typedef", "return",
+        NULL
+    };
+    const char *best = NULL;
+    int best_dist = 999;
+    for (int i = 0; builtins[i]; ++i) {
+        int d = edit_distance_ci(name, builtins[i]);
+        if (d < best_dist) {
+            best_dist = d;
+            best = builtins[i];
+        }
+    }
+    if (out_dist) *out_dist = best_dist;
+    return best;
+}
+
+static void semantic_error_undeclared_with_hint(int line, const char *kind, const char *name, SymbolKind symbol_kind_hint) {
+    char msg[512];
+    int best_sym_dist = 999;
+    Symbol *best_sym = find_closest_symbol_in_scope_chain(name, symbol_kind_hint, &best_sym_dist);
+    int best_builtin_dist = 999;
+    const char *best_builtin = find_closest_builtin_name(name, &best_builtin_dist);
+
+    if (best_sym && best_sym_dist <= 2 && (!best_builtin || best_sym_dist <= best_builtin_dist)) {
+        snprintf(msg, sizeof(msg), "Undeclared %s '%s'. Did you mean '%s'?", kind, name, best_sym->name);
+    } else if (best_builtin && best_builtin_dist <= 2) {
+        snprintf(msg, sizeof(msg), "Undeclared %s '%s'. Did you mean '%s'?", kind, name, best_builtin);
+    } else {
+        snprintf(msg, sizeof(msg), "Undeclared %s '%s'", kind, name);
+    }
+
+    semantic_error(line, msg);
+}
+
+static void resolve_decl_type(ASTNode *type_node,
+                              int declarator_pointer,
+                              int line,
+                              DataType *out_type,
+                              int *out_pointer,
+                              Symbol **out_struct_def) {
+    DataType type = TYPE_VOID;
+    int pointer = declarator_pointer;
+    Symbol *struct_def = NULL;
+
+    if (type_node) {
+        type = type_node->data_type;
+        pointer += type_node->pointer_level;
+    }
+
+    if (type_node && type_node->str_val) {
+        Symbol *s = lookup(type_node->str_val);
+        if (s && s->kind == SYM_TYPEDEF) {
+            type = s->type;
+            pointer += s->pointer_level;
+            struct_def = s->struct_def;
+        } else if (type == TYPE_STRUCT) {
+            if (s && s->kind == SYM_STRUCT) {
+                struct_def = s;
+            } else {
+                semantic_error(line, "Unknown struct/typedef type");
+            }
+        }
+    }
+
+    if (out_type) *out_type = type;
+    if (out_pointer) *out_pointer = pointer;
+    if (out_struct_def) *out_struct_def = struct_def;
+}
 
 static Symbol *find_struct_member(Symbol *struct_sym, const char *name) {
     if (!struct_sym || struct_sym->kind != SYM_STRUCT) return NULL;
@@ -349,10 +472,17 @@ void analyze_struct_def(ASTNode *node) {
             continue;
         }
 
-        Symbol *m = create_symbol(member->str_val, member->left->data_type, SYM_VARIABLE, member->line_number);
+        DataType member_type = TYPE_VOID;
+        int member_pointer = 0;
+        Symbol *member_struct_def = NULL;
+        resolve_decl_type(member->left, member->pointer_level, member->line_number,
+                  &member_type, &member_pointer, &member_struct_def);
+
+        Symbol *m = create_symbol(member->str_val, member_type, SYM_VARIABLE, member->line_number);
         m->access_modifier = current_access;
         m->defining_struct = sym;
-        m->pointer_level = member->pointer_level;
+        m->pointer_level = member_pointer;
+        m->struct_def = member_struct_def;
         m->array_dim_count = member->array_dim_count;
         if (member->array_dim_count > 0) {
             m->is_array = 1;
@@ -372,15 +502,6 @@ void analyze_struct_def(ASTNode *node) {
                 } else {
                     m->array_sizes[i] = -1;
                 }
-            }
-        }
-
-        if (member->left->data_type == TYPE_STRUCT && member->left->str_val) {
-            Symbol *sub = lookup(member->left->str_val);
-            if (!sub || sub->kind != SYM_STRUCT) {
-                semantic_error(member->line_number, "Unknown struct type for member");
-            } else {
-                m->struct_def = sub;
             }
         }
 
@@ -448,13 +569,19 @@ void analyze_struct_def(ASTNode *node) {
 }
 
 void analyze_function(ASTNode *node, const char *unmangled_name) {
+    DataType ret_type = TYPE_VOID;
+    int ret_pointer = 0;
+    Symbol *ret_struct_def = NULL;
+    resolve_decl_type(node->left, 0, node->line_number, &ret_type, &ret_pointer, &ret_struct_def);
+
     Symbol *func = create_symbol(
         node->str_val,
-        node->left->data_type,
+        ret_type,
         SYM_FUNCTION,
         node->line_number
     );
-    func->pointer_level = node->left->pointer_level;
+    func->pointer_level = ret_pointer;
+    func->struct_def = ret_struct_def;
 
     if (current_class) {
         func->defining_struct = current_class;
@@ -465,13 +592,6 @@ void analyze_function(ASTNode *node, const char *unmangled_name) {
     if (!insert_symbol(func)) {
         semantic_error(node->line_number, "Function redeclared");
         return;
-    }
-
-    if (node->left->data_type == TYPE_STRUCT && node->left->str_val) {
-        Symbol *struct_sym = lookup(node->left->str_val);
-        if (struct_sym && struct_sym->kind == SYM_STRUCT) {
-            func->struct_def = struct_sym;
-        }
     }
 
     current_function = func;
@@ -499,15 +619,13 @@ void analyze_function(ASTNode *node, const char *unmangled_name) {
     param = node->params;
     int i = 0;
     while (param) {
-        func->param_types[i] = param->left->data_type;
-        func->param_pointer_levels[i] = param->pointer_level;
-        func->param_struct_defs[i] = NULL;
-        if (param->left->data_type == TYPE_STRUCT && param->left->str_val) {
-            Symbol *struct_sym = lookup(param->left->str_val);
-            if (struct_sym && struct_sym->kind == SYM_STRUCT) {
-                func->param_struct_defs[i] = struct_sym;
-            }
-        }
+        DataType p_type = TYPE_VOID;
+        int p_ptr = 0;
+        Symbol *p_struct_def = NULL;
+        resolve_decl_type(param->left, param->pointer_level, param->line_number, &p_type, &p_ptr, &p_struct_def);
+        func->param_types[i] = p_type;
+        func->param_pointer_levels[i] = p_ptr;
+        func->param_struct_defs[i] = p_struct_def;
         func->param_is_array[i] = (param->int_val != 0);
         func->param_names[i] = strdup(param->str_val);
         param = param->next;
@@ -520,20 +638,20 @@ void analyze_function(ASTNode *node, const char *unmangled_name) {
     i = 0;
     current_local_offset = 0;
     while (param) {
+        DataType p_type = TYPE_VOID;
+        int p_ptr = 0;
+        Symbol *p_struct_def = NULL;
+        resolve_decl_type(param->left, param->pointer_level, param->line_number, &p_type, &p_ptr, &p_struct_def);
+
         Symbol *sym = create_symbol(
             param->str_val,
-            param->left->data_type,
+            p_type,
             SYM_PARAMETER,
             param->line_number
         );
 
-        sym->pointer_level = param->pointer_level;
-        if (param->left->data_type == TYPE_STRUCT && param->left->str_val) {
-            Symbol *struct_sym = lookup(param->left->str_val);
-            if (struct_sym && struct_sym->kind == SYM_STRUCT) {
-                sym->struct_def = struct_sym;
-            }
-        }
+        sym->pointer_level = p_ptr;
+        sym->struct_def = p_struct_def;
 
         if (param->int_val != 0) {
             sym->is_array = 1;
@@ -562,20 +680,46 @@ void analyze_function(ASTNode *node, const char *unmangled_name) {
 }
 
 void analyze_declaration(ASTNode *node) {
+    DataType decl_type = TYPE_VOID;
+    int decl_pointer = 0;
+    Symbol *decl_struct_def = NULL;
+    resolve_decl_type(node->left, node->pointer_level, node->line_number,
+                      &decl_type, &decl_pointer, &decl_struct_def);
+
+    if (node->is_typedef) {
+        if (node->right) {
+            semantic_error(node->line_number, "typedef alias cannot have an initializer");
+        }
+        if (node->array_dim_count > 0) {
+            semantic_error(node->line_number, "typedef arrays are not supported in this compiler yet");
+        }
+
+        Symbol *tsym = create_symbol(node->str_val, decl_type, SYM_TYPEDEF, node->line_number);
+        tsym->pointer_level = decl_pointer;
+        tsym->struct_def = decl_struct_def;
+        tsym->is_const = node->is_const;
+
+        if (!insert_symbol(tsym)) {
+            semantic_error(node->line_number, "Type alias redeclared");
+        }
+        return;
+    }
+
     Symbol *sym = create_symbol(
         node->str_val,
-        node->left->data_type,
+        decl_type,
         SYM_VARIABLE,
         node->line_number
     );
 
     if (node->type == NODE_ARRAY_DECL) {
         if (node->int_val <= 0) semantic_error(node->line_number, "Array size must be positive");
-        else if (node->left->data_type == TYPE_VOID) semantic_error(node->line_number, "Array element type cannot be void");
+        else if (decl_type == TYPE_VOID) semantic_error(node->line_number, "Array element type cannot be void");
         sym->is_array = 1;
         sym->array_size = node->int_val;
     } else if (node->type == NODE_VAR_DECL) {
-        sym->pointer_level = node->pointer_level;
+        sym->pointer_level = decl_pointer;
+        sym->struct_def = decl_struct_def;
         sym->array_dim_count = node->array_dim_count;
         if (node->array_dim_count > 0) {
             sym->is_array = 1;
@@ -594,16 +738,10 @@ void analyze_declaration(ASTNode *node) {
         }
     }
 
-    if (node->left->data_type == TYPE_STRUCT && node->left->str_val) {
-        Symbol *struct_sym = lookup(node->left->str_val);
-        if (!struct_sym || struct_sym->kind != SYM_STRUCT) {
-            semantic_error(node->line_number, "Unknown struct type");
-        } else {
-            sym->struct_def = struct_sym;
-        }
-    }
+    sym->pointer_level = decl_pointer;
+    sym->struct_def = decl_struct_def;
 
-    int size = get_type_size(node->left->data_type, sym->pointer_level, sym->struct_def);
+    int size = get_type_size(decl_type, sym->pointer_level, sym->struct_def);
     if (sym->is_array && sym->array_size > 0) {
         size = size * sym->array_size;
     } else if (sym->is_array && sym->array_dim_count > 0) {
@@ -698,7 +836,7 @@ void analyze_variable(ASTNode *node) {
             }
         }
         
-        semantic_error(node->line_number, "Undeclared variable");
+        semantic_error_undeclared_with_hint(node->line_number, "variable", node->str_val, (SymbolKind)-1);
         node->data_type = TYPE_INT;
         return;
     }
@@ -958,7 +1096,17 @@ void analyze_index(ASTNode *node) {
 // CRITICAL FIX: Clones the 'this' argument so it doesn't accidentally
 // mutate the AST DAG structure and cause duplicate statements.
 void analyze_function_call(ASTNode *node) {
-    analyze_node(node->left);
+    if (node->left && node->left->type == NODE_VAR) {
+        Symbol *callee = lookup(node->left->str_val);
+        if (callee) {
+            node->left->sym = callee;
+            node->left->data_type = callee->type;
+            node->left->pointer_level = callee->pointer_level;
+            node->left->struct_def = callee->struct_def;
+        }
+    } else {
+        analyze_node(node->left);
+    }
 
     ASTNode *arg = node->right;
     while (arg) {
@@ -1075,7 +1223,9 @@ void analyze_function_call(ASTNode *node) {
     }
 
     if (!sym || sym->kind != SYM_FUNCTION) {
-        semantic_error(node->line_number, "Undeclared function");
+        const char *name = (node->left && node->left->type == NODE_VAR) ? node->left->str_val :
+                           (node->left && node->left->type == NODE_MEMBER_ACCESS ? node->left->str_val : "<call>");
+        semantic_error_undeclared_with_hint(node->line_number, "function", name, SYM_FUNCTION);
         return;
     }
 
@@ -1289,6 +1439,7 @@ static void analyze_printf_scanf(ASTNode *node, int is_scanf) {
 void analyze_new(ASTNode *node) {
     DataType type = TYPE_INT;
     Symbol *struct_def = NULL;
+    int base_pointer_level = 0;
 
     if (strcmp(node->str_val, "int") == 0) {
         type = TYPE_INT;
@@ -1298,7 +1449,11 @@ void analyze_new(ASTNode *node) {
         type = TYPE_VOID;
     } else {
         Symbol *sym = lookup(node->str_val);
-        if (sym && sym->kind == SYM_STRUCT) {
+        if (sym && sym->kind == SYM_TYPEDEF) {
+            type = sym->type;
+            struct_def = sym->struct_def;
+            base_pointer_level = sym->pointer_level;
+        } else if (sym && sym->kind == SYM_STRUCT) {
             type = TYPE_STRUCT;
             struct_def = sym;
         } else {
@@ -1308,7 +1463,7 @@ void analyze_new(ASTNode *node) {
 
     node->data_type = type;
     node->struct_def = struct_def;
-    node->pointer_level = 1;
+    node->pointer_level = base_pointer_level + 1;
 
     if (type == TYPE_STRUCT && struct_def) {
         char buf[256];

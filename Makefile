@@ -10,6 +10,7 @@ BUILD_DIR = build
 OBJS = $(BUILD_DIR)/y.tab.o \
        $(BUILD_DIR)/lex.yy.o \
        $(BUILD_DIR)/ast.o \
+	$(BUILD_DIR)/parser_typedefs.o \
        $(BUILD_DIR)/symbol_table.o \
        $(BUILD_DIR)/semantic.o \
        $(BUILD_DIR)/ir.o \

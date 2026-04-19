@@ -4,16 +4,39 @@
     {
       "id": 1,
       "nodes": [
-        {"id": 0, "label": "  a$10.0 := 10", "priority": 1}
+        {"id": 0, "label": "  *q$12 = 1", "priority": 7},
+        {"id": 1, "label": "q$12[1] = 2", "priority": 6},
+        {"id": 2, "label": "  t0.0 = *q$12", "priority": 5},
+        {"id": 3, "label": "  t1.0 = q$12[1]", "priority": 5},
+        {"id": 4, "label": "  t2.0 := t0.0 + t1.0", "priority": 2},
+        {"id": 5, "label": "  if t2.0 == 3 goto L2", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 5},
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 5},
+        {"from": 1, "to": 3},
+        {"from": 1, "to": 2},
+        {"from": 2, "to": 5},
+        {"from": 2, "to": 4},
+        {"from": 3, "to": 5},
+        {"from": 3, "to": 4},
+        {"from": 4, "to": 5}
+      ]
+    },
+    {
+      "id": 2,
+      "nodes": [
+        {"id": 0, "label": "  return 0", "priority": 1}
       ],
       "edges": [
 
       ]
     },
     {
-      "id": 2,
+      "id": 3,
       "nodes": [
-        {"id": 0, "label": "  return a$10.0", "priority": 1}
+        {"id": 0, "label": "  return 1", "priority": 1}
       ],
       "edges": [
 

@@ -1,0 +1,18 @@
+{
+  "func_name": "Derived_func",
+  "blocks": [
+    {
+      "id": 1,
+      "nodes": [
+        {"id": 0, "label": "  param .LC2", "priority": 3},
+        {"id": 1, "label": "  call printf, 1", "priority": 2},
+        {"id": 2, "label": "  return", "priority": 1}
+      ],
+      "edges": [
+        {"from": 0, "to": 2},
+        {"from": 0, "to": 1},
+        {"from": 1, "to": 2}
+      ]
+    }
+  ]
+}
