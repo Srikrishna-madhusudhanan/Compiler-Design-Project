@@ -88,7 +88,7 @@ cleanup_all() { rm -f "$TMP_EXE" "$TIME_OUTPUT"; }
 trap cleanup_all EXIT INT TERM
 
 # FIX 5: Pass only the real compiler flags (not --metrics) to the compiler.
-$RISCVC "${COMPILER_FLAGS[@]}" -static -o "$TMP_EXE" output.s
+$RISCVC "${COMPILER_FLAGS[@]}" -static -o "$TMP_EXE" output.s src/exception_runtime.s
 
 # --- EXECUTION WITH REAL BENCHMARK METRICS ---
 echo "--> Executing in QEMU..."

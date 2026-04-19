@@ -56,7 +56,7 @@ CFG* build_cfg(IRFunc *f) {
 
         while (curr) {
             new_bb->last = curr;
-            if (curr->kind == IR_GOTO || curr->kind == IR_IF || curr->kind == IR_RETURN) {
+            if (curr->kind == IR_GOTO || curr->kind == IR_IF || curr->kind == IR_RETURN || curr->kind == IR_TRY_BEGIN || curr->kind == IR_THROW) {
                 curr = curr->next;
                 break;
             }
@@ -77,11 +77,11 @@ CFG* build_cfg(IRFunc *f) {
         if (last->kind == IR_GOTO) {
             BasicBlock *target = find_bb_by_label(head, last->label);
             if (target) add_succ(bb, target);
-        } else if (last->kind == IR_IF) {
+        } else if (last->kind == IR_IF || last->kind == IR_TRY_BEGIN) {
             BasicBlock *target = find_bb_by_label(head, last->label);
             if (target) add_succ(bb, target);
             if (bb->next) add_succ(bb, bb->next);
-        } else if (last->kind != IR_RETURN) {
+        } else if (last->kind != IR_RETURN && last->kind != IR_THROW) {
             if (bb->next) add_succ(bb, bb->next);
         }
         bb = bb->next;
@@ -233,7 +233,7 @@ static IRInstr* simplify_control_flow(IRInstr *head) {
                 changed = 1;
             }
 
-            if (curr->kind == IR_GOTO || curr->kind == IR_RETURN) {
+            if (curr->kind == IR_GOTO || curr->kind == IR_RETURN || curr->kind == IR_THROW) {
                 while (curr->next && curr->next->kind != IR_LABEL) {
                     IRInstr *to_del = curr->next;
                     curr->next = to_del->next;
@@ -501,7 +501,7 @@ static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, Cop
     else if (instr->kind == IR_BINOP) { ops[0] = &instr->left; ops[1] = &instr->right; num_ops = 2; }
     else if (instr->kind == IR_UNOP) { ops[0] = &instr->unop_src; num_ops = 1; }
     else if (instr->kind == IR_IF) { ops[0] = &instr->if_left; ops[1] = &instr->if_right; num_ops = 2; }
-    else if (instr->kind == IR_RETURN) { ops[0] = &instr->src; num_ops = 1; }
+    else if (instr->kind == IR_RETURN || instr->kind == IR_THROW) { ops[0] = &instr->src; num_ops = 1; }
     else if (instr->kind == IR_PARAM) { ops[0] = &instr->src; num_ops = 1; }
     else if (instr->kind == IR_LOAD) { ops[0] = &instr->base; ops[1] = &instr->index; num_ops = 2; }
     else if (instr->kind == IR_STORE) { ops[0] = &instr->base; ops[1] = &instr->index; ops[2] = &instr->store_val; num_ops = 3; }
@@ -746,7 +746,7 @@ static void compute_use_def(BasicBlock *bb) {
         else if (curr->kind == IR_UNOP) { ops[0] = &curr->unop_src; num_ops = 1; }
         else if (curr->kind == IR_PARAM) { ops[0] = &curr->src; num_ops = 1; }
         else if (curr->kind == IR_IF) { ops[0] = &curr->if_left; ops[1] = &curr->if_right; num_ops = 2; }
-        else if (curr->kind == IR_RETURN) { ops[0] = &curr->src; num_ops = 1; }
+        else if (curr->kind == IR_RETURN || curr->kind == IR_THROW) { ops[0] = &curr->src; num_ops = 1; }
         else if (curr->kind == IR_LOAD) { ops[0] = &curr->base; ops[1] = &curr->index; num_ops = 2; }
         else if (curr->kind == IR_STORE) { ops[0] = &curr->base; ops[1] = &curr->index; ops[2] = &curr->store_val; num_ops = 3; }
         else if (curr->kind == IR_ALLOCA) { ops[0] = &curr->src; num_ops = 1; }

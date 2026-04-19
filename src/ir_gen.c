@@ -1038,6 +1038,7 @@ static void gen_stmt(ASTNode *node, IRInstr **list) {
             ir_append(list, ir_make_label(L_skip, line));
             if (ptr.name) free(ptr.name);
             free(L_skip);
+            break;
         }
         case NODE_TRY: {
             char *L_catch = ir_new_label();
