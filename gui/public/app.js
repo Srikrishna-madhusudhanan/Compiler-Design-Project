@@ -8,6 +8,8 @@ const optLevel = document.getElementById('opt-level');
 const exampleSelect = document.getElementById('example-select');
 const animAstBtn = document.getElementById('anim-ast');
 const animRaBtn = document.getElementById('anim-ra');
+const animSchedBtn = document.getElementById('anim-sched');
+const funcSelect = document.getElementById('func-select');
 const asmOutput = document.getElementById('asm-output');
 
 
@@ -21,6 +23,8 @@ const mMem = document.getElementById('m-mem');
 let astNetwork = null;
 let raNetwork = null;
 let currentAstData = null;
+let currentRaDataArray = [];
+let currentCfgDataArray = [];
 let currentRaData = null;
 let currentCfgData = null;
 let metricsChart = null;
@@ -466,8 +470,26 @@ compileBtn.addEventListener('click', async () => {
             mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ms)';
             
             currentAstData = data.ast_json;
-            currentRaData = data.ra_json[0]; // Take first function
-            currentCfgData = data.cfg_json[0];
+            currentRaDataArray = data.ra_json || [];
+            currentCfgDataArray = data.cfg_json || [];
+            
+            // Populate function selector
+            funcSelect.innerHTML = '';
+            currentRaDataArray.forEach((ra, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = ra.func_name || `Function ${idx}`;
+                funcSelect.appendChild(opt);
+            });
+
+            if (currentRaDataArray.length > 0) {
+                currentRaData = currentRaDataArray[0];
+                // Match CFG by function name if possible
+                currentCfgData = currentCfgDataArray.find(c => c.func_name === currentRaData.func_name) || currentCfgDataArray[0];
+            } else {
+                currentRaData = null;
+                currentCfgData = null;
+            }
             
             // Static viz
             if (data.asm) asmOutput.textContent = data.asm;
@@ -568,6 +590,19 @@ function renderStaticViz(ast, ra) {
 
 animAstBtn.addEventListener('click', () => animateAst(currentAstData));
 animRaBtn.addEventListener('click', () => animateRa(currentRaData));
+animSchedBtn.addEventListener('click', () => animateSched());
+
+funcSelect.addEventListener('change', () => {
+    const idx = parseInt(funcSelect.value);
+    if (!isNaN(idx) && currentRaDataArray[idx]) {
+        currentRaData = currentRaDataArray[idx];
+        currentCfgData = currentCfgDataArray.find(c => c.func_name === currentRaData.func_name) || currentCfgDataArray[idx] || currentCfgDataArray[0];
+        
+        log(`Switched visualization to function: ${currentRaData.func_name}`, 'info');
+        if (currentCfgData) renderCFG(currentCfgData);
+        if (currentRaData) renderRegisterUsage(currentRaData);
+    }
+});
 
 runBtn.addEventListener('click', async () => {
     if (!editor.value.trim()) { log('No code to run. Write or load a program first.', 'warning'); return; }
@@ -730,9 +765,10 @@ function getSchedTier(priority, maxPriority) {
 }
 
 async function animateSched() {
-    log('Loading scheduling DAG data...', 'info');
+    const currentFunc = currentRaData ? currentRaData.func_name : 'main';
+    log(`Loading scheduling DAG data for ${currentFunc}...`, 'info');
     try {
-        const response = await fetch('/api/sched/main');
+        const response = await fetch(`/api/sched/${currentFunc}`);
         if (!response.ok) throw new Error('Scheduling data not found. Compile first.');
         const data = await response.json();
         if (!data.blocks || data.blocks.length === 0) {

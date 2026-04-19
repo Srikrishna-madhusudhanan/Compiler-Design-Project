@@ -25,7 +25,9 @@ app.post('/api/compile', (req, res) => {
     // Cleanup old interference files
     const oldFiles = fs.readdirSync(ROOT_DIR);
     oldFiles.forEach(f => {
-        if (f.endsWith('_interference.json') || f.endsWith('_cfg.json')) fs.unlinkSync(path.join(ROOT_DIR, f));
+        if (f.endsWith('_interference.json') || f.endsWith('_cfg.json') || f.endsWith('_sched.json') || f.endsWith('_interference.dot')) {
+            fs.unlinkSync(path.join(ROOT_DIR, f));
+        }
     });
 
     let optFlag = `-O${optimizationLevel}`;
