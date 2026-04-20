@@ -1,7 +1,7 @@
 int main() {
-    int a
+    intt a;
     a = 10; // Missing semicolon above
     if (a > 5) {
         return a;
-   
+    }
 } // Missing closing brace

@@ -4,6 +4,7 @@
 #include "symbol_table.h"
 #include "ast.h"
 #include "semantic.h"
+#include "error_utils.h"
 #include "y.tab.h"
 
 static Symbol *current_function = NULL;
@@ -597,7 +598,7 @@ void analyze_declaration(ASTNode *node) {
     if (node->left->data_type == TYPE_STRUCT && node->left->str_val) {
         Symbol *struct_sym = lookup(node->left->str_val);
         if (!struct_sym || struct_sym->kind != SYM_STRUCT) {
-            semantic_error(node->line_number, "Unknown struct type");
+            semantic_error_with_suggestion(node->line_number, "Unknown struct type", node->left->str_val);
         } else {
             sym->struct_def = struct_sym;
         }
@@ -698,7 +699,7 @@ void analyze_variable(ASTNode *node) {
             }
         }
         
-        semantic_error(node->line_number, "Undeclared variable");
+        semantic_error_with_suggestion(node->line_number, "Undeclared variable", node->str_val);
         node->data_type = TYPE_INT;
         return;
     }
@@ -1075,7 +1076,7 @@ void analyze_function_call(ASTNode *node) {
     }
 
     if (!sym || sym->kind != SYM_FUNCTION) {
-        semantic_error(node->line_number, "Undeclared function");
+        semantic_error_with_suggestion(node->line_number, "Undeclared function", node->left->str_val);
         return;
     }
 
@@ -1302,7 +1303,7 @@ void analyze_new(ASTNode *node) {
             type = TYPE_STRUCT;
             struct_def = sym;
         } else {
-            semantic_error(node->line_number, "Unknown type in new expression");
+            semantic_error_with_suggestion(node->line_number, "Unknown type in new expression", node->str_val);
         }
     }
 

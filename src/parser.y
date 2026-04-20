@@ -860,6 +860,28 @@ int parse_errors = 0;
 
 void yyerror(const char *s) {
     fprintf(stderr, "Parser Error: %s at line %d, column %d (token: %s)\n", s, line_num, col_num, yytext);
+    // Suggest missing semicolon if syntax error and token looks like start of new statement
+    if (strcmp(s, "syntax error") == 0) {
+        if (strcmp(yytext, "int") == 0 || strcmp(yytext, "void") == 0 || strcmp(yytext, "char") == 0 ||
+            strcmp(yytext, "struct") == 0 || strcmp(yytext, "class") == 0 || strcmp(yytext, "if") == 0 ||
+            strcmp(yytext, "while") == 0 || strcmp(yytext, "for") == 0 || strcmp(yytext, "return") == 0 ||
+            strcmp(yytext, "break") == 0 || strcmp(yytext, "continue") == 0 || strcmp(yytext, "printf") == 0 ||
+            strcmp(yytext, "scanf") == 0 || strcmp(yytext, "new") == 0 || strcmp(yytext, "delete") == 0 ||
+            strcmp(yytext, "try") == 0 || strcmp(yytext, "catch") == 0 || strcmp(yytext, "throw") == 0 ||
+            strcmp(yytext, "else") == 0 || strcmp(yytext, "case") == 0 || strcmp(yytext, "default") == 0 ||
+            strcmp(yytext, "public") == 0 || strcmp(yytext, "private") == 0 || strcmp(yytext, "virtual") == 0 ||
+            strcmp(yytext, "const") == 0) {
+            fprintf(stderr, "Did you mean to add ';' before this?\n");
+        }
+        // Suggest missing closing brace if token is '}'
+        else if (strcmp(yytext, "}") == 0) {
+            fprintf(stderr, "Unexpected '}'. Did you forget to close a block or add a statement?\n");
+        }
+        // Suggest missing opening brace
+        else if (strcmp(yytext, "else") == 0) {
+            fprintf(stderr, "Unexpected 'else'. Did you forget '{' after the 'if' condition?\n");
+        }
+    }
     parse_errors++;
 }
 
