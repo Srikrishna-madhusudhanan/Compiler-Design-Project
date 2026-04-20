@@ -99,23 +99,7 @@
                         <div class="panel-controls"><button class="min-btn">_</button><button class="max-btn">▢</button></div>
                     </div>
                     <div class="panel-content" style="display: flex;">
-                        <div class="dashboard-grid" id="metrics-grid" style="flex: 1;">
-                            <div class="metric-card">
-                                <div class="metric-value" id="m-pre-ir">-</div>
-                                <div class="metric-label">Pre-Opt IR</div>
-                            </div>
-                            <div class="metric-card">
-                                <div class="metric-value" id="m-post-ir">-</div>
-                                <div class="metric-label">Post-Opt IR</div>
-                            </div>
-                            <div class="metric-card">
-                                <div class="metric-value" id="m-time">-</div>
-                                <div class="metric-label">Exec Time (ms)</div>
-                            </div>
-                            <div class="metric-card">
-                                <div class="metric-value" id="m-mem">-</div>
-                                <div class="metric-label">Peak Mem (KB)</div>
-                            </div>
+                        <div class="dashboard-grid" id="metrics-grid" style="flex: 1; display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start;">
                         </div>
                         <div class="chart-container" style="flex: 1;">
                             <canvas id="metrics-chart"></canvas>

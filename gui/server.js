@@ -58,7 +58,7 @@ app.post('/api/compile', (req, res) => {
             let metricsText = fs.readFileSync(metricsFile, 'utf8');
 
             // Strip execution time and peak memory lines — these only belong in benchmark mode
-            metricsText = metricsText.replace(/Execution time.*\n?/gi, '');
+            metricsText = metricsText.replace(/Avg execution time.*\n?/gi, '');
             metricsText = metricsText.replace(/Peak memory.*\n?/gi, '');
 
             // Fix IR instruction counts by counting actual instruction lines from the IR files.
@@ -89,8 +89,8 @@ app.post('/api/compile', (req, res) => {
             }
             const preCount = countIR(result.ir);
             const postCount = countIR(result.ir_opt);
-            metricsText = metricsText.replace(/Code size \(IR instructions, pre-opt\):[^\n]*/, `Code size (IR instructions, pre-opt):    ${preCount}`);
-            metricsText = metricsText.replace(/Code size \(IR instructions, post-opt\):[^\n]*/, `Code size (IR instructions, post-opt):   ${postCount}`);
+            metricsText = metricsText.replace(/IR instructions \(pre\):[^\n]*/, `IR instructions (pre):         ${preCount}`);
+            metricsText = metricsText.replace(/IR instructions \(post\):[^\n]*/, `IR instructions (post):        ${postCount}`);
 
             result.metrics = metricsText;
         }
@@ -103,9 +103,9 @@ app.post('/api/compile', (req, res) => {
         const files = fs.readdirSync(ROOT_DIR);
         files.forEach(file => {
             if (file.endsWith('_interference.json')) {
-                try { result.ra_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8'))); } catch (e) {}
+                try { result.ra_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8'))); } catch (e) { console.error('RA parse:', e); }
             } else if (file.endsWith('_cfg.json')) {
-                try { result.cfg_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8'))); } catch (e) {}
+                try { result.cfg_json.push(JSON.parse(fs.readFileSync(path.join(ROOT_DIR, file), 'utf8'))); } catch (e) { console.error('CFG parse:', e); }
             }
         });
 

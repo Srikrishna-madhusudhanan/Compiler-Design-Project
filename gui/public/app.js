@@ -11,11 +11,7 @@ const animRaBtn = document.getElementById('anim-ra');
 const asmOutput = document.getElementById('asm-output');
 
 
-// Metrics Elements
-const mPreIr = document.getElementById('m-pre-ir');
-const mPostIr = document.getElementById('m-post-ir');
-const mTime = document.getElementById('m-time');
-const mMem = document.getElementById('m-mem');
+// Metrics Elements removed since they are rendered dynamically
 
 // Visualization Data
 let astNetwork = null;
@@ -460,14 +456,10 @@ compileBtn.addEventListener('click', async () => {
             // Parse Metrics (compile mode: only IR counts, no exec time/mem)
             const metrics = parseMetrics(data.metrics);
             updateDashboard(metrics);
-            // Explicitly clear runtime metrics — they only belong to benchmark mode
-            mTime.textContent = '-';
-            mMem.textContent = '-';
-            mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ms)';
             
             currentAstData = data.ast_json;
-            currentRaData = data.ra_json[0]; // Take first function
-            currentCfgData = data.cfg_json[0];
+            currentRaData = data.ra_json.find(d => d.func_name === 'main') || data.ra_json[0]; // Take main or first function
+            currentCfgData = data.cfg_json.find(d => d.func_name === 'main') || data.cfg_json[0];
             
             // Static viz
             if (data.asm) asmOutput.textContent = data.asm;
@@ -485,73 +477,109 @@ compileBtn.addEventListener('click', async () => {
 });
 
 function parseMetrics(text) {
-    if (!text) return {};
-    const metrics = {};
+    if (!text) return { groups: [], all: [] };
+    const metrics = { groups: [], all: [] };
     const lines = text.split('\n');
+    let current_group = { name: "General", metrics: [] };
     
     lines.forEach(line => {
-        // Handle pre/post IR counts
-        const preMatch = line.match(/IR instructions, pre-opt.*:\s+(\d+)/i);
-        if (preMatch) metrics.preIr = parseInt(preMatch[1]);
+        line = line.trim();
+        if (!line || line.startsWith('=')) return;
         
-        const postMatch = line.match(/IR instructions, post-opt.*:\s+(\d+)/i);
-        if (postMatch) metrics.postIr = parseInt(postMatch[1]);
-
-        // Handle execution time (wall)
-        const timeMatch = line.match(/Execution time(?:\s*\(wall\))?:\s*([\d\.,]+)/i);
-        if (timeMatch) {
-            metrics.time = parseFloat(timeMatch[1].replace(/,/g, ''));
-            if (line.toLowerCase().includes('ns')) metrics.unit = 'ns';
-            else if (line.toLowerCase().includes('ms')) metrics.unit = 'ms';
-            else if (line.toLowerCase().includes(' us')) metrics.unit = 'us';
-            else metrics.unit = 's';
+        if (line.startsWith('-- ') && line.endsWith(' --')) {
+            if (current_group.metrics.length > 0) metrics.groups.push(current_group);
+            current_group = { name: line.replace(/--/g, '').trim(), metrics: [] };
+            return;
         }
 
-        // Handle peak memory
-        const memMatch = line.match(/Peak memory(?:\s+usage)?.*:\s+(.*)/i);
-        if (memMatch) {
-            const rawVal = memMatch[1].trim();
-            const val = rawVal.split(/\s+/)[0].replace(/,/g, '');
-            const parsedMem = parseInt(val);
-            if (!isNaN(parsedMem)) {
-                metrics.mem = parsedMem;
-            } else if (rawVal.toLowerCase().includes('unknown')) {
-                metrics.mem = 'Unknown';
+        const idx = line.indexOf(':');
+        if (idx !== -1) {
+            const label = line.substring(0, idx).trim();
+            const valStr = line.substring(idx + 1).trim();
+            const metricObj = { label, value: valStr };
+            metrics.all.push(metricObj);
+            current_group.metrics.push(metricObj);
+            
+            // Extract for chart and logs
+            if (label.toLowerCase().includes('ir instructions (pre)')) {
+                metrics.preIr = parseInt(valStr);
+            }
+            if (label.toLowerCase().includes('ir instructions (post)')) {
+                metrics.postIr = parseInt(valStr);
+            }
+            if (label.toLowerCase().includes('execution time')) {
+                const timeMatch = valStr.match(/([\d\.,]+)/);
+                if (timeMatch) metrics.time = parseFloat(timeMatch[1].replace(/,/g, ''));
+                if (valStr.toLowerCase().includes('ms')) metrics.unit = 'ms';
+                else if (valStr.toLowerCase().includes('ns')) metrics.unit = 'ns';
+                else if (valStr.toLowerCase().includes('us')) metrics.unit = 'us';
+                else metrics.unit = 's';
+            }
+            if (label.toLowerCase().includes('peak memory')) {
+                const memMatch = valStr.match(/([\d\.,]+)/);
+                if (memMatch) {
+                    metrics.mem = parseInt(memMatch[1].replace(/,/g, ''));
+                } else if (valStr.toLowerCase().includes('unknown')) {
+                    metrics.mem = 'Unknown';
+                }
             }
         }
     });
+
+    if (current_group.metrics.length > 0) metrics.groups.push(current_group);
 
     return metrics;
 }
 
 function updateDashboard(metrics) {
-    if (metrics.preIr !== undefined) mPreIr.textContent = metrics.preIr;
-    if (metrics.postIr !== undefined) mPostIr.textContent = metrics.postIr;
+    const grid = document.getElementById('metrics-grid');
+    grid.innerHTML = '';
     
-    if (metrics.time !== undefined && !isNaN(metrics.time)) {
-        if (metrics.unit === 'ns') {
-            mTime.textContent = Math.round(metrics.time);
-            mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ns)';
-        } else if (metrics.unit === 'ms') {
-            mTime.textContent = metrics.time.toFixed(2);
-            mTime.parentElement.querySelector('.metric-label').textContent = 'Exec Time (ms)';
-        } else {
-            mTime.textContent = metrics.time.toFixed(6);
-        }
+    if (metrics.groups && metrics.groups.length > 0) {
+        metrics.groups.forEach(group => {
+            const groupWrap = document.createElement('div');
+            groupWrap.style.flex = '1 1 100%';
+            groupWrap.style.gap = '10px';
+            groupWrap.style.display = 'flex';
+            groupWrap.style.flexWrap = 'wrap';
+            groupWrap.style.background = 'rgba(255, 255, 255, 0.02)';
+            groupWrap.style.padding = '10px';
+            groupWrap.style.borderRadius = '8px';
+            groupWrap.style.marginBottom = '10px';
+            groupWrap.style.border = '1px solid var(--border-color)';
+            
+            const titleRow = document.createElement('div');
+            titleRow.style.width = '100%';
+            titleRow.style.color = 'var(--accent-color)';
+            titleRow.style.fontWeight = 'bold';
+            titleRow.style.marginBottom = '5px';
+            titleRow.style.fontSize = '0.9rem';
+            titleRow.textContent = group.name;
+            groupWrap.appendChild(titleRow);
+
+            group.metrics.forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'metric-card';
+                card.style.flex = '1 1 110px';
+                card.style.minHeight = '65px';
+                card.style.background = 'rgba(0,0,0,0.2)';
+                
+                const valDiv = document.createElement('div');
+                valDiv.className = 'metric-value';
+                valDiv.textContent = m.value;
+                
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'metric-label';
+                labelDiv.textContent = m.label;
+                
+                card.appendChild(valDiv);
+                card.appendChild(labelDiv);
+                groupWrap.appendChild(card);
+            });
+            grid.appendChild(groupWrap);
+        });
     } else {
-        mTime.textContent = '-';
-    }
-    
-    if (metrics.mem !== undefined) {
-        if (!isNaN(metrics.mem)) {
-            mMem.textContent = metrics.mem;
-        } else if (typeof metrics.mem === 'string' && metrics.mem === 'Unknown') {
-            mMem.textContent = 'Unknown';
-        } else {
-            mMem.textContent = '-';
-        }
-    } else {
-        mMem.textContent = '-';
+        grid.innerHTML = '<div style="color:var(--text-secondary); text-align:center; width:100%; padding-top:20px;">No metrics generated yet.</div>';
     }
     
     metricsChart.data.datasets[0].data = [metrics.preIr || 0];

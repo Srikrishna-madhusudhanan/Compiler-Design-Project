@@ -863,6 +863,27 @@ void reg_alloc_export_dot(InterferenceGraph *ig, RegAllocResult *res,
     printf("[reg_alloc] Interference graph written to %s\n", path);
 }
 
+static void print_escaped_json_string(FILE *fp, const char *str) {
+    if (!str) return;
+    for (const char *p = str; *p; p++) {
+        switch (*p) {
+            case '\"': fprintf(fp, "\\\""); break;
+            case '\\': fprintf(fp, "\\\\"); break;
+            case '\b': fprintf(fp, "\\b"); break;
+            case '\f': fprintf(fp, "\\f"); break;
+            case '\n': fprintf(fp, "\\n"); break;
+            case '\r': fprintf(fp, "\\r"); break;
+            case '\t': fprintf(fp, "\\t"); break;
+            default:
+                if (*p >= 0 && *p <= 0x1f) {
+                    fprintf(fp, "\\u%04x", *p);
+                } else {
+                    fputc(*p, fp);
+                }
+        }
+    }
+}
+
 void reg_alloc_export_json(InterferenceGraph *ig, RegAllocResult *res, 
                            int *stack, int stack_size, const char *path) {
     if (!ig || !path) return;
@@ -916,8 +937,9 @@ void reg_alloc_export_json(InterferenceGraph *ig, RegAllocResult *res,
     /* Liveness Trace */
     fprintf(fp, "  \"liveness_history\": [\n");
     for (int i = 0; i < ig->trace_count; i++) {
-        fprintf(fp, "    {\"idx\": %d, \"instr\": \"%s\", \"live\": [", 
-                ig->liveness_trace[i].instr_idx, ig->liveness_trace[i].asm_line);
+        fprintf(fp, "    {\"idx\": %d, \"instr\": \"", ig->liveness_trace[i].instr_idx);
+        print_escaped_json_string(fp, ig->liveness_trace[i].asm_line);
+        fprintf(fp, "\", \"live\": [");
         for (int j = 0; j < ig->liveness_trace[i].count; j++) {
             fprintf(fp, "\"%s\"%s", ig->liveness_trace[i].live_vars[j], (j == ig->liveness_trace[i].count - 1) ? "" : ", ");
         }
