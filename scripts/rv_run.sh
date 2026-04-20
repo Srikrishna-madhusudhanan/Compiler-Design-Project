@@ -10,7 +10,12 @@ RVAS=./tools/rvas/rvas
 RVLD=./tools/rvld/rvld
 QEMU=${QEMU_RISCV:-$(command -v qemu-riscv64 || command -v qemu-riscv64-static || true)}
 
+# Library Paths - Hardcoded for this environment based on research
+LIBC_DIR="/usr/riscv64-linux-gnu/lib"
+LIBGCC_DIR="/usr/lib/gcc-cross/riscv64-linux-gnu/13"
+
 # Ensure tools are built
+echo "--> Building tools..."
 make -C tools/rvas > /dev/null
 make -C tools/rvld > /dev/null
 if [ ! -x "$PARSER" ]; then
@@ -55,16 +60,23 @@ echo "--> Assembling..."
 mkdir -p build/obj
 "$RVAS" src/io_runtime.s -o build/obj/io_runtime.o
 "$RVAS" src/exception_runtime.s -o build/obj/exception_runtime.o
+# Compile our custom minilib
+riscv64-linux-gnu-gcc -c src/minilib.c -o build/obj/minilib.o -ffreestanding -fno-builtin -nostdlib -O2
 "$RVAS" output.s -o build/obj/output.o
 
-# 3. Link
-echo "--> Linking..."
-"$RVLD" -o build/a.out build/obj/io_runtime.o build/obj/exception_runtime.o build/obj/output.o
+# 3. Link with our custom minilib
+echo "--> Linking with custom minilib..."
+"$RVLD" -o build/program.elf \
+    build/obj/io_runtime.o \
+    build/obj/minilib.o \
+    build/obj/exception_runtime.o \
+    build/obj/output.o
+
 
 # 4. Run
 echo "--> Executing in QEMU..."
 if [ -n "$INPUT" ]; then
-    printf '%s' "$INPUT" | "$QEMU" build/a.out
+    printf '%s' "$INPUT" | "$QEMU" build/program.elf
 else
-    "$QEMU" build/a.out
+    "$QEMU" build/program.elf
 fi

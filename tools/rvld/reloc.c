@@ -179,6 +179,26 @@ bool apply_relocations(LinkerCtx *ctx) {
                     }
                     case 33: // R_RISCV_RELAX
                         break;
+                    case 35: // R_RISCV_ADD32
+                        if (rel->r_offset + 4 <= target->size)
+                            *(uint32_t *)patch_site += (uint32_t)(S + A);
+                        break;
+                    case 36: // R_RISCV_ADD64
+                        if (rel->r_offset + 8 <= target->size)
+                            *(uint64_t *)patch_site += (S + A);
+                        break;
+                    case 39: // R_RISCV_SUB32
+                        if (rel->r_offset + 4 <= target->size)
+                            *(uint32_t *)patch_site -= (uint32_t)(S + A);
+                        break;
+                    case 40: // R_RISCV_SUB64
+                        if (rel->r_offset + 8 <= target->size)
+                            *(uint64_t *)patch_site -= (S + A);
+                        break;
+                    case 57: // R_RISCV_32_PCREL
+                        if (rel->r_offset + 4 <= target->size)
+                            *(uint32_t *)patch_site = (uint32_t)(S + A - P);
+                        break;
                     default:
                         // Ignore unknown
                         break;

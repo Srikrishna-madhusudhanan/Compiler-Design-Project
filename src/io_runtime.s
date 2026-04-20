@@ -1,46 +1,34 @@
-  .section .rodata
-__io_stub_msg: .asciz "rvld: I/O STUB called\n"
-
-  .text
+  .section .text
   .globl _start
 _start:
-  # Initialize stack pointer (optional but good practice)
-  # QEMU usually sets it up, but we could do it here if we had a __stack_top.
-  # For now, we assume sp is already valid.
+  # a0 = argc, a1 = argv, a2 = envp  (loaded by QEMU)
+  # Pass argc/argv to main
   call main
-  # a0 already has main's return value
-  call exit
-  # Should not return
-
-  .globl printf
-printf:
-  # Simple stub: just print a message that it was called.
-  # Real printf is too complex for this minimal runtime.
-  # In a real scenario, this would be provided by a real libc.
-  li a7, 64          # sys_write
-  li a0, 1           # stdout
-  la a1, __io_stub_msg
-  li a2, 22          # length
+  # a0 = return value from main
+  li   a7, 93         # __NR_exit
   ecall
-  li a0, 0
+
+  # Syscall wrappers for minilib.c
+  .globl __sys_read
+__sys_read:
+  li a7, 63           # __NR_read
+  ecall
   ret
 
-  .globl scanf
-scanf:
-  li a0, 0
+  .globl __sys_write
+__sys_write:
+  li a7, 64           # __NR_write
+  ecall
   ret
 
-  .globl malloc
-malloc:
-  li a0, 0           # Return NULL
+  .globl __sys_brk
+__sys_brk:
+  li a7, 214          # __NR_brk
+  ecall
   ret
 
-  .globl free
-free:
-  ret
-
-  .globl exit
-exit:
-  li a7, 93          # sys_exit
+  .globl __sys_exit
+__sys_exit:
+  li a7, 93           # __NR_exit
   ecall
   ret

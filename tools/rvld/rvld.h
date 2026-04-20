@@ -52,6 +52,12 @@ typedef struct {
     GlobalSymbol *globals;
     int           global_count;
 
+    /* Library search */
+    char        **search_paths;
+    int           search_path_count;
+    char        **lib_names;
+    int           lib_name_count;
+
     /* Output segment virtual addresses and sizes */
     uint64_t text_vaddr;
     uint64_t data_vaddr;
@@ -64,10 +70,17 @@ typedef struct {
 
 /* elf_parse.c */
 ObjectFile *load_object_file(const char *filename);
+ObjectFile *load_object_from_memory(const uint8_t *data, size_t size, const char *name);
 void        free_object_file(ObjectFile *obj);
 
+/* archive.c */
+ObjectFile *search_and_load_from_archive(const char *archive_path, const char *symbol_name);
+bool load_archives_to_resolve(LinkerCtx *ctx);
+
 /* linker.c */
+bool collect_definitions(LinkerCtx *ctx);
 bool resolve_symbols(LinkerCtx *ctx);
+bool check_undefined_symbols(LinkerCtx *ctx);
 bool layout_sections(LinkerCtx *ctx, uint64_t base_addr);
 
 /* reloc.c */

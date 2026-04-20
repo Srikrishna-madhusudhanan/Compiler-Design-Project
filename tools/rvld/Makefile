@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -g
-SRCS = main.c elf_parse.c linker.c reloc.c elf_write.c
+SRCS = main.c elf_parse.c linker.c reloc.c elf_write.c archive.c
 OBJS = $(SRCS:.c=.o)
 TARGET = rvld
 

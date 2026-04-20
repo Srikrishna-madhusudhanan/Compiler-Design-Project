@@ -3,46 +3,78 @@
 #include <string.h>
 
 int main(int argc, char **argv) {
-    if (argc < 4 || strcmp(argv[1], "-o") != 0) {
-        fprintf(stderr, "Usage: %s -o <output> <input1> [<input2> ...]\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s -o <output> <inputs...> [-L <path>...] [-l <lib>...]\n", argv[0]);
         return 1;
     }
 
-    const char *out_filename = argv[2];
+    const char *out_filename = NULL;
     LinkerCtx ctx = {0};
-    ctx.obj_count = argc - 3;
-    ctx.objs = calloc(ctx.obj_count, sizeof(ObjectFile *));
 
-    for (int i = 0; i < ctx.obj_count; i++) {
-        ctx.objs[i] = load_object_file(argv[i + 3]);
-        if (!ctx.objs[i]) {
-            fprintf(stderr, "rvld: failed to load %s\n", argv[i + 3]);
-            return 1;
+    /* Basic argument parsing */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-o") == 0) {
+            if (++i < argc) out_filename = argv[i];
+        } else if (strncmp(argv[i], "-L", 2) == 0) {
+            const char *path = NULL;
+            if (strlen(argv[i]) > 2) path = argv[i] + 2;
+            else if (++i < argc) path = argv[i];
+            if (path) {
+                ctx.search_paths = realloc(ctx.search_paths, (ctx.search_path_count + 1) * sizeof(char *));
+                ctx.search_paths[ctx.search_path_count++] = (char *)path;
+            }
+        } else if (strncmp(argv[i], "-l", 2) == 0) {
+            const char *name = NULL;
+            if (strlen(argv[i]) > 2) name = argv[i] + 2;
+            else if (++i < argc) name = argv[i];
+            if (name) {
+                ctx.lib_names = realloc(ctx.lib_names, (ctx.lib_name_count + 1) * sizeof(char *));
+                ctx.lib_names[ctx.lib_name_count++] = (char *)name;
+            }
+        } else {
+            /* Input object file */
+            ObjectFile *obj = load_object_file(argv[i]);
+            if (!obj) return 1;
+            ctx.objs = realloc(ctx.objs, (ctx.obj_count + 1) * sizeof(ObjectFile *));
+            ctx.objs[ctx.obj_count++] = obj;
         }
     }
 
+    if (!out_filename || ctx.obj_count == 0) {
+        fprintf(stderr, "rvld: error: no output filename or no input files specified\n");
+        return 1;
+    }
+
+    /* 1. Initial symbol collection */
     if (!resolve_symbols(&ctx)) {
-        fprintf(stderr, "rvld: symbol resolution failed\n");
         return 1;
     }
 
-    // Base address 0x10000 for simple RISC-V QEMU/spike execution
+    /* 2. Iterative library resolution */
+    if (!load_archives_to_resolve(&ctx)) {
+        return 1;
+    }
+
+    /* 3. Final undefined check */
+    if (!check_undefined_symbols(&ctx)) {
+        return 1;
+    }
+
+    /* 4. Layout */
     if (!layout_sections(&ctx, 0x10000)) {
-        fprintf(stderr, "rvld: section layout failed\n");
         return 1;
     }
 
+    /* 5. Relocate */
     if (!apply_relocations(&ctx)) {
-        fprintf(stderr, "rvld: relocation application failed\n");
         return 1;
     }
 
+    /* 6. Write */
     if (!write_executable(&ctx, out_filename)) {
-        fprintf(stderr, "rvld: executable generation failed\n");
         return 1;
     }
 
     printf("rvld: successfully linked -> %s\n", out_filename);
-
     return 0;
 }

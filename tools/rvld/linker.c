@@ -10,32 +10,38 @@
  * Phase 1: collect all global DEFINED symbols.
  * Phase 2: verify every global UNDEFINED reference is satisfied.
  * ------------------------------------------------------------------------- */
-bool resolve_symbols(LinkerCtx *ctx) {
-    /* Phase 1: definitions */
+bool collect_definitions(LinkerCtx *ctx) {
     for (int i = 0; i < ctx->obj_count; i++) {
         ObjectFile *obj = ctx->objs[i];
         if (!obj->symtab || !obj->strtab) continue;
 
-        for (int j = 1; j < obj->symbol_count; j++) {   /* skip sym 0 (null) */
+        for (int j = 1; j < obj->symbol_count; j++) {
             Elf64_Sym *sym = &obj->symtab[j];
             if (ELF64_ST_BIND(sym->st_info) != STB_GLOBAL) continue;
-            if (sym->st_shndx == SHN_UNDEF) continue;   /* undefined — skip */
+            if (sym->st_shndx == SHN_UNDEF) continue;
 
             const char *name = obj->strtab + sym->st_name;
 
-            /* Check for duplicate definition */
+            /* Check if already defined */
+            bool exists = false;
             for (int k = 0; k < ctx->global_count; k++) {
                 if (strcmp(ctx->globals[k].name, name) == 0) {
-                    fprintf(stderr,
-                        "rvld: error: multiple definition of '%s'\n"
-                        "       first defined in %s\n"
-                        "       redefined  in   %s\n",
-                        name,
-                        ctx->globals[k].obj->filename,
-                        obj->filename);
-                    return false;
+                    /* If same object, ignore. If different, it's a multiple definition */
+                    if (ctx->globals[k].obj != obj) {
+                        fprintf(stderr,
+                            "rvld: error: multiple definition of '%s'\n"
+                            "       first defined in %s\n"
+                            "       redefined  in   %s\n",
+                            name,
+                            ctx->globals[k].obj->filename,
+                            obj->filename);
+                        return false;
+                    }
+                    exists = true;
+                    break;
                 }
             }
+            if (exists) continue;
 
             /* Grow global table */
             GlobalSymbol *ng = realloc(ctx->globals,
@@ -45,7 +51,7 @@ bool resolve_symbols(LinkerCtx *ctx) {
 
             GlobalSymbol *gs = &ctx->globals[ctx->global_count++];
             gs->name  = strdup(name);
-            gs->value = sym->st_value;  /* will be updated by layout_sections */
+            gs->value = sym->st_value;
             gs->size  = sym->st_size;
             gs->info  = sym->st_info;
             gs->other = sym->st_other;
@@ -53,8 +59,10 @@ bool resolve_symbols(LinkerCtx *ctx) {
             gs->obj   = obj;
         }
     }
+    return true;
+}
 
-    /* Phase 2: undefined references */
+bool check_undefined_symbols(LinkerCtx *ctx) {
     bool ok = true;
     for (int i = 0; i < ctx->obj_count; i++) {
         ObjectFile *obj = ctx->objs[i];
@@ -79,6 +87,11 @@ bool resolve_symbols(LinkerCtx *ctx) {
         }
     }
     return ok;
+}
+
+bool resolve_symbols(LinkerCtx *ctx) {
+    if (!collect_definitions(ctx)) return false;
+    return true; // Don't check undefined yet, let archive resolution handle it
 }
 
 /* -------------------------------------------------------------------------
