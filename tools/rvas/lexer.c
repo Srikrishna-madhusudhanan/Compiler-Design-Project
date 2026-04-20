@@ -49,8 +49,7 @@ RvToken rvas_lexer_next(RvLexer *L) {
             L->pos++;
             L->line_no++;
         }
-        rvas_lexer_line_start(L);
-        return rvas_lexer_next(L);
+        return tok_simple(TOK_EOL, L, start);
     }
 
     if (c == '\n') {

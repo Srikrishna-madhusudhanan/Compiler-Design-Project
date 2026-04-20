@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
-enum { SEC_UNDEF = 0, SEC_TEXT = 1, SEC_RODATA = 2, SEC_DATA = 3 };
+enum { SEC_UNDEF = 0, SEC_TEXT = 1, SEC_RODATA = 2, SEC_DATA = 3, SEC_BSS = 4 };
 
 static void buf_free(RvBuf *b) {
     free(b->data);
@@ -46,6 +46,8 @@ static RvBuf *cur_buf(RvAsmResult *a, RvSectionKind k) {
         return &a->rodata;
     if (k == RV_SEC_DATA)
         return &a->data;
+    if (k == RV_SEC_BSS)
+        return &a->bss;
     return NULL;
 }
 
@@ -99,6 +101,7 @@ void rvas_asm_result_free(RvAsmResult *r) {
     buf_free(&r->text);
     buf_free(&r->rodata);
     buf_free(&r->data);
+    buf_free(&r->bss);
     for (size_t i = 0; i < r->sym_count; i++)
         free(r->syms[i].name);
     free(r->syms);
@@ -126,6 +129,8 @@ static int sec_kind_to_num(RvSectionKind k) {
         return SEC_RODATA;
     if (k == RV_SEC_DATA)
         return SEC_DATA;
+    if (k == RV_SEC_BSS)
+        return SEC_BSS;
     return SEC_UNDEF;
 }
 
@@ -295,6 +300,7 @@ static bool emit_stmt(RvAsmResult *a, RvSectionKind sec, RvStmt *st, char *err) 
     RvOperand *o = st->ops;
     int n = (int)st->op_count;
 
+
     if (strcmp(m, "mv") == 0 && n == 2) {
         RvOperand x[3] = {o[0], o[1], {RV_OP_IMM, .imm = 0}};
         return emit_real(a, sec, "addi", x, 3, err);
@@ -315,6 +321,10 @@ static bool emit_stmt(RvAsmResult *a, RvSectionKind sec, RvStmt *st, char *err) 
         RvOperand x[3] = {{RV_OP_REG, .reg = 0}, o[0], {RV_OP_IMM, .imm = 0}};
         return emit_real(a, sec, "jalr", x, 3, err);
     }
+    if (strcmp(m, "ret") == 0 && n == 0) {
+        RvOperand x[3] = {{RV_OP_REG, .reg = 0}, {RV_OP_REG, .reg = 1}, {RV_OP_IMM, .imm = 0}};
+        return emit_real(a, sec, "jalr", x, 3, err);
+    }
     if (strcmp(m, "li") == 0 && n == 2 && o[0].kind == RV_OP_REG && o[1].kind == RV_OP_IMM) {
         int32_t im = o[1].imm;
         if (im >= -2048 && im <= 2047) {
@@ -329,6 +339,9 @@ static bool emit_stmt(RvAsmResult *a, RvSectionKind sec, RvStmt *st, char *err) 
         RvOperand loop = {RV_OP_IMM, .imm = lo};
         RvOperand x2[3] = {o[0], o[0], loop};
         return emit_real(a, sec, "addi", x2, 3, err);
+    }
+    if (strcmp(m, "ecall") == 0 && n == 0) {
+        return emit_insn(a, sec, 0x00000073, err);
     }
     /* bgt rs,rt,L -> blt rt,rs,L ; ble rs,rt,L -> bge rt,rs,L */
     if (strcmp(m, "bgt") == 0 && n == 3)
@@ -370,7 +383,7 @@ static bool emit_stmt(RvAsmResult *a, RvSectionKind sec, RvStmt *st, char *err) 
         RvOperand ad[3] = {o[0], o[0], {RV_OP_IMM, .imm = 0}};
         if (!emit_real(a, sec, "addi", ad, 3, err))
             return false;
-        if (!add_fixup(a, RV_FIX_LO12, sec, off_addi, o[1].sym))
+        if (!add_fixup(a, RV_FIX_LO12, sec, off_addi, ilab))
             return false;
 
         return true;
@@ -470,6 +483,8 @@ bool rvas_assemble(RvStmt **stmts, size_t n, RvAsmResult *out) {
             else if (strcmp(st->dir, ".section") == 0 && st->dir_argc >= 1) {
                 if (strcmp(st->dir_args[0], ".rodata") == 0)
                     cur = RV_SEC_RODATA;
+                else if (strcmp(st->dir_args[0], ".bss") == 0)
+                    cur = RV_SEC_BSS;
             } else if (strcmp(st->dir, ".globl") == 0 && st->dir_argc >= 1) {
                 RvSym *g = sym_get(out, st->dir_args[0]);
                 if (g)
@@ -478,8 +493,22 @@ bool rvas_assemble(RvStmt **stmts, size_t n, RvAsmResult *out) {
                 RvBuf *b = cur_buf(out, cur);
                 if (!buf_append(b, st->dir_args[0], strlen(st->dir_args[0]) + 1)) {
                     out->error = strdup("oom");
-                    rvas_asm_result_free(out);
                     return false;
+                }
+            } else if (strcmp(st->dir, ".space") == 0 && st->dir_argc == 1) {
+                RvBuf *b = cur_buf(out, cur);
+                if (!b) {
+                    out->error = strdup("no section");
+                    return false;
+                }
+                size_t count = (size_t)strtoull(st->dir_args[0], NULL, 0);
+                if (count > 0) {
+                    if (!buf_reserve(b, count)) {
+                        out->error = strdup("oom");
+                        return false;
+                    }
+                    memset(b->data + b->len, 0, count);
+                    b->len += count;
                 }
             } else if (strcmp(st->dir, ".dword") == 0) {
                 for (size_t i = 0; i < st->dir_argc; i++) {
@@ -491,7 +520,6 @@ bool rvas_assemble(RvStmt **stmts, size_t n, RvAsmResult *out) {
                     if (!symbol) z = (uint64_t)strtoull(arg, NULL, 0);
                     if (!buf_append(b, &z, 8)) {
                         out->error = strdup("oom");
-                        rvas_asm_result_free(out);
                         return false;
                     }
                     if (symbol) {
@@ -528,7 +556,6 @@ bool rvas_assemble(RvStmt **stmts, size_t n, RvAsmResult *out) {
         if (st->kind == RV_STMT_INSN) {
             if (!emit_stmt(out, cur, st, err)) {
                 out->error = strdup(err);
-                rvas_asm_result_free(out);
                 return false;
             }
         }
@@ -536,7 +563,6 @@ bool rvas_assemble(RvStmt **stmts, size_t n, RvAsmResult *out) {
 
     if (!pass2(out, err)) {
         out->error = strdup(err);
-        rvas_asm_result_free(out);
         return false;
     }
     return true;

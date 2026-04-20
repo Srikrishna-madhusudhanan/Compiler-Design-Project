@@ -7,12 +7,16 @@ static uint64_t align_up(uint64_t x, uint64_t al) {
     return (x + al - 1) & ~(al - 1);
 }
 
+#include <sys/stat.h>
+
 bool write_executable(LinkerCtx *ctx, const char *out_filename) {
     FILE *f = fopen(out_filename, "wb");
     if (!f) {
         perror("rvld: fopen");
         return false;
     }
+    int fd = fileno(f);
+    fchmod(fd, 0755);
 
     uint64_t header_sz = sizeof(Elf64_Ehdr) + 2 * sizeof(Elf64_Phdr);
 

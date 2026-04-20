@@ -1,8 +1,17 @@
   .section .rodata
-  .balign 4
-__io_stub_msg: .string "rvld: I/O STUB called\n"
+__io_stub_msg: .asciz "rvld: I/O STUB called\n"
 
   .text
+  .globl _start
+_start:
+  # Initialize stack pointer (optional but good practice)
+  # QEMU usually sets it up, but we could do it here if we had a __stack_top.
+  # For now, we assume sp is already valid.
+  call main
+  # a0 already has main's return value
+  call exit
+  # Should not return
+
   .globl printf
 printf:
   # Simple stub: just print a message that it was called.

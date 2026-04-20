@@ -88,6 +88,10 @@ bool apply_relocations(LinkerCtx *ctx) {
                 uint8_t *patch_site = target->data + rel->r_offset;
                 
                 switch (type) {
+                    case 1: // R_RISCV_32
+                        if (rel->r_offset + 4 <= target->size)
+                            *(uint32_t *)patch_site = (uint32_t)(S + A);
+                        break;
                     case 2: // R_RISCV_64
                         if (rel->r_offset + 8 <= target->size)
                             *(uint64_t *)patch_site = S + A;
@@ -130,8 +134,43 @@ bool apply_relocations(LinkerCtx *ctx) {
                     }
                     case 24: // R_RISCV_PCREL_LO12_I
                     {
-                        // Simplified: assume it follows HI20 and uses same symbol
-                        int32_t imm = (int32_t)(S + A - (P - 4));
+                        uint64_t target_value = S;
+                        if (ELF64_ST_BIND(sym->st_info) != STB_GLOBAL && sym->st_shndx < obj->section_count) {
+                            // Local anchor symbol: find matching HI20 immediate source if present.
+                            for (int m = 0; m < rela_count; m++) {
+                                Elf64_Rela *r2 = &relas[m];
+                                if (r2->r_offset + 4 != rel->r_offset)
+                                    continue;
+                                if (ELF64_R_TYPE(r2->r_info) != R_RISCV_PCREL_HI20)
+                                    continue;
+                                int sym_hi_idx = ELF64_R_SYM(r2->r_info);
+                                if (sym_hi_idx < 0 || sym_hi_idx >= obj->symbol_count)
+                                    break;
+                                Elf64_Sym *sym_hi = &obj->symtab[sym_hi_idx];
+                                if (ELF64_ST_BIND(sym_hi->st_info) == STB_GLOBAL) {
+                                    char *name = obj->strtab + sym_hi->st_name;
+                                    bool found = false;
+                                    for (int g = 0; g < ctx->global_count; g++) {
+                                        if (strcmp(ctx->globals[g].name, name) == 0) {
+                                            target_value = ctx->globals[g].value;
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        fprintf(stderr, "rvld: error: relocation against undefined symbol '%s'\n", name);
+                                        return false;
+                                    }
+                                } else if (sym_hi->st_shndx < obj->section_count) {
+                                    target_value = obj->sections[sym_hi->st_shndx].addr + sym_hi->st_value;
+                                } else if (sym_hi->st_shndx == SHN_ABS) {
+                                    target_value = sym_hi->st_value;
+                                }
+                                break;
+                            }
+                        }
+
+                        int32_t imm = (int32_t)(target_value + A - (P - 4));
                         int32_t hi = (imm + 0x800) & ~0xfff;
                         int32_t lo = imm - hi;
                         uint32_t insn = *(uint32_t *)patch_site;

@@ -119,6 +119,9 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
         } else if (s->sec == 3) {
             sym_out[idx].shndx = 3;
             sym_out[idx].value = s->value;
+        } else if (s->sec == 4) {
+            sym_out[idx].shndx = 4;
+            sym_out[idx].value = s->value;
         } else {
             sym_out[idx].shndx = SHN_UNDEF;
             sym_out[idx].value = 0;
@@ -158,8 +161,8 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
     if (!sym_out)
         goto fail;
 
-    Elf64_Rela *rt = NULL, *rd = NULL;
-    size_t rtn = 0, rdn = 0, rtcap = 0, rdcap = 0;
+    Elf64_Rela *rt = NULL, *rr = NULL, *rd = NULL;
+    size_t rtn = 0, rrn = 0, rdn = 0, rtcap = 0, rrcap = 0, rdcap = 0;
 
     for (size_t i = 0; i < a->fix_count; i++) {
         RvFixup *f = &a->fixups[i];
@@ -199,6 +202,16 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
                 if (!append_rela(&rt, &rtn, &rtcap, rx))
                     goto fail;
             }
+        } else if (f->sec == 2) {
+            if (!append_rela(&rr, &rrn, &rrcap, rel))
+                goto fail;
+            if (rtype == RV_R_PCREL_HI20 || rtype == RV_R_PCREL_LO12_I || rtype == RV_R_CALL_PLT) {
+                Elf64_Rela rx = {.r_offset = f->off,
+                                 .r_info = ELF64_R_INFO(0, RV_R_RELAX),
+                                 .r_addend = 0};
+                if (!append_rela(&rr, &rrn, &rrcap, rx))
+                    goto fail;
+            }
         } else if (f->sec == 3) {
             if (!append_rela(&rd, &rdn, &rdcap, rel))
                 goto fail;
@@ -207,7 +220,7 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
     }
 
     static const char shstr[] =
-        "\0.text\0.rodata\0.data\0.shstrtab\0.strtab\0.symtab\0.rela.text\0.rela.data\0";
+        "\0.text\0.rodata\0.data\0.bss\0.shstrtab\0.strtab\0.symtab\0.rela.text\0.rela.rodata\0.rela.data\0";
     size_t shstr_sz = sizeof(shstr);
 
     size_t off = sizeof(Elf64_Ehdr);
@@ -220,6 +233,9 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
     off = align_up(off, 8);
     size_t off_data = off;
     off += a->data.len;
+    off = align_up(off, 8);
+    size_t off_bss = off;
+    size_t bss_sz = a->bss.len;
     off = align_up(off, 8);
     size_t off_symtab = off;
     size_t symtab_sz = sym_n * sizeof(Elf64_Sym);
@@ -236,12 +252,16 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
     size_t rela_text_sz = rtn * sizeof(Elf64_Rela);
     off += rela_text_sz;
     off = align_up(off, 8);
+    size_t off_rela_rodata = off;
+    size_t rela_rodata_sz = rrn * sizeof(Elf64_Rela);
+    off += rela_rodata_sz;
+    off = align_up(off, 8);
     size_t off_rela_data = off;
     size_t rela_data_sz = rdn * sizeof(Elf64_Rela);
     off += rela_data_sz;
     off = align_up(off, 8);
     size_t off_shdr = off;
-    const int SHNUM = 9;
+    const int SHNUM = 11;
     size_t shdr_sz = SHNUM * sizeof(Elf64_Shdr);
     size_t total = off_shdr + shdr_sz;
 
@@ -261,7 +281,7 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
     eh->e_ehsize = sizeof(Elf64_Ehdr);
     eh->e_shentsize = sizeof(Elf64_Shdr);
     eh->e_shnum = SHNUM;
-    eh->e_shstrndx = 4;
+    eh->e_shstrndx = 5;
     eh->e_flags = 0x4; /* EF_RISCV_FLOAT_ABI_DOUBLE */
 
     memcpy(buf + off_text, a->text.data, a->text.len);
@@ -282,6 +302,8 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
     memcpy(buf + off_shstrtab, shstr, shstr_sz);
     if (rela_text_sz && rt)
         memcpy(buf + off_rela_text, rt, rela_text_sz);
+    if (rela_rodata_sz && rr)
+        memcpy(buf + off_rela_rodata, rr, rela_rodata_sz);
     if (rela_data_sz && rd)
         memcpy(buf + off_rela_data, rd, rela_data_sz);
 
@@ -298,43 +320,57 @@ bool rvas_write_elf64_o(const RvAsmResult *a, FILE *out) {
                          .sh_offset = off_rodata,
                          .sh_size = a->rodata.len,
                          .sh_addralign = 1};
-    sh[3] = (Elf64_Shdr){.sh_name = 16,
+    sh[3] = (Elf64_Shdr){.sh_name = 15,
                          .sh_type = SHT_PROGBITS,
                          .sh_flags = SHF_ALLOC | SHF_WRITE,
                          .sh_offset = off_data,
                          .sh_size = a->data.len,
                          .sh_addralign = 8};
-    sh[4] = (Elf64_Shdr){.sh_name = 22,
+    sh[4] = (Elf64_Shdr){.sh_name = 21,
+                         .sh_type = SHT_NOBITS,
+                         .sh_flags = SHF_ALLOC | SHF_WRITE,
+                         .sh_offset = 0,
+                         .sh_size = bss_sz,
+                         .sh_addralign = 8};
+    sh[5] = (Elf64_Shdr){.sh_name = 27,
                          .sh_type = SHT_STRTAB,
                          .sh_offset = off_shstrtab,
                          .sh_size = shstr_sz,
                          .sh_addralign = 1};
-    sh[5] = (Elf64_Shdr){.sh_name = 32,
+    sh[6] = (Elf64_Shdr){.sh_name = 37,
                          .sh_type = SHT_STRTAB,
                          .sh_offset = off_strtab,
                          .sh_size = str_sz,
                          .sh_addralign = 1};
-    sh[6] = (Elf64_Shdr){.sh_name = 40,
+    sh[7] = (Elf64_Shdr){.sh_name = 45,
                          .sh_type = SHT_SYMTAB,
                          .sh_offset = off_symtab,
                          .sh_size = symtab_sz,
-                         .sh_link = 5,
+                         .sh_link = 6,
                          .sh_info = (uint32_t)first_global_after_reorder,
                          .sh_addralign = 8,
                          .sh_entsize = sizeof(Elf64_Sym)};
-    sh[7] = (Elf64_Shdr){.sh_name = 48,
+    sh[8] = (Elf64_Shdr){.sh_name = 53,
                          .sh_type = SHT_RELA,
                          .sh_offset = off_rela_text,
                          .sh_size = rela_text_sz,
-                         .sh_link = 6,
+                         .sh_link = 7,
                          .sh_info = 1,
                          .sh_addralign = 8,
                          .sh_entsize = sizeof(Elf64_Rela)};
-    sh[8] = (Elf64_Shdr){.sh_name = 59,
+    sh[9] = (Elf64_Shdr){.sh_name = 64,
+                         .sh_type = SHT_RELA,
+                         .sh_offset = off_rela_rodata,
+                         .sh_size = rela_rodata_sz,
+                         .sh_link = 7,
+                         .sh_info = 2,
+                         .sh_addralign = 8,
+                         .sh_entsize = sizeof(Elf64_Rela)};
+    sh[10] = (Elf64_Shdr){.sh_name = 77,
                          .sh_type = SHT_RELA,
                          .sh_offset = off_rela_data,
                          .sh_size = rela_data_sz,
-                         .sh_link = 6,
+                         .sh_link = 7,
                          .sh_info = 3,
                          .sh_addralign = 8,
                          .sh_entsize = sizeof(Elf64_Rela)};

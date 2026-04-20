@@ -14,6 +14,7 @@ typedef enum {
     RV_SEC_TEXT,
     RV_SEC_RODATA,
     RV_SEC_DATA,
+    RV_SEC_BSS,
 } RvSectionKind;
 
 typedef enum {

@@ -40,7 +40,7 @@ typedef struct {
 } RvFixup;
 
 typedef struct {
-    RvBuf text, rodata, data;
+    RvBuf text, rodata, data, bss;
     RvSym *syms;
     size_t sym_count;
     RvFixup *fixups;

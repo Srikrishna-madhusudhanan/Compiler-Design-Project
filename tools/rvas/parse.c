@@ -147,6 +147,21 @@ static RvStmt *parse_directive(RvToken *toks, size_t nt, int line_no, RvParseRes
         return st;
     }
 
+    if (strcmp(st->dir, ".section") == 0) {
+        if (nt < 2 || toks[1].kind != TOK_IDENT) {
+            set_err(r, ".section needs identifier");
+            rvas_stmt_free(st);
+            free(st);
+            return NULL;
+        }
+        if (!append_dir_arg(st, xstrdup(toks[1].ptr, toks[1].len))) {
+            rvas_stmt_free(st);
+            free(st);
+            return NULL;
+        }
+        return st;
+    }
+
     for (size_t i = 1; i < nt; i++) {
         if (toks[i].kind == TOK_COMMA)
             continue;

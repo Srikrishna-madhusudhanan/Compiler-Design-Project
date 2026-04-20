@@ -1,12 +1,11 @@
   .data
   .globl __paninic_try_stack_ptr
-__paninic_try_stack_ptr: 
+__paninic_try_stack_ptr:
   .dword 0
 
   .section .bss
-  .balign 8
-__paninic_try_stack: 
-  .space 2048  # Space for try/catch contexts
+__paninic_try_stack:
+  .space 2048
 
   .text
   # __paninic_push_try_context
