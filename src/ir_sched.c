@@ -152,11 +152,15 @@ static void record_def(DepTracker *t, SchedNode *n, const char *name) {
  * ------------------------------------------------------------------------- */
 
 static int is_barrier(IRInstr *instr) {
+    if (!instr) return 0;
     switch (instr->kind) {
         case IR_LABEL:
         case IR_GOTO:
         case IR_IF:
         case IR_RETURN:
+        case IR_TRY_BEGIN:
+        case IR_TRY_END:
+        case IR_THROW:
             return 1;
         default: return 0;
     }
@@ -250,6 +254,13 @@ static void build_dag(SchedNode *nodes, int count) {
                 uses[n_use++] = &inst->index; 
                 uses[n_use++] = &inst->store_val; 
                 break;
+            case IR_TRY_BEGIN:
+                /* try_begin is a call and a control flow barrier */
+                break;
+            case IR_THROW:
+                uses[n_use++] = &inst->src;
+                /* throw is a call */
+                break;
             default: break;
         }
         
@@ -320,7 +331,7 @@ static IRInstr *schedule_block(IRInstr *first, IRInstr *last, int count) {
         nodes[i].is_barrier = is_barrier(curr);
         nodes[i].is_load = (curr->kind == IR_LOAD);
         nodes[i].is_store = (curr->kind == IR_STORE);
-        nodes[i].is_call = (curr->kind == IR_CALL || curr->kind == IR_CALL_INDIRECT);
+        nodes[i].is_call = (curr->kind == IR_CALL || curr->kind == IR_CALL_INDIRECT || curr->kind == IR_TRY_BEGIN || curr->kind == IR_THROW);
         curr = curr->next;
     }
     

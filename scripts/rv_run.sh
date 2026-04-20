@@ -74,7 +74,7 @@ echo "--> Linking with custom minilib..."
 
 
 # 4. Run
-echo "--> Executing in QEMU..."
+echo -e "--> Executing in QEMU...\n"
 if [ -n "$INPUT" ]; then
     printf '%s' "$INPUT" | "$QEMU" build/program.elf
 else

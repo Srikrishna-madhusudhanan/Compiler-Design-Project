@@ -352,6 +352,15 @@ static bool emit_stmt(RvAsmResult *a, RvSectionKind sec, RvStmt *st, char *err) 
         return emit_branch(a, sec, 0, &o[0], &o[1], o[2].sym, err);
     if (strcmp(m, "bne") == 0 && n == 3)
         return emit_branch(a, sec, 1, &o[0], &o[1], o[2].sym, err);
+    if (strcmp(m, "beqz") == 0 && n == 2) {
+        RvOperand z = {RV_OP_REG, .reg = 0};
+        return emit_branch(a, sec, 0, &o[0], &z, o[1].sym, err);
+    }
+    if (strcmp(m, "bnez") == 0 && n == 2) {
+        RvOperand z = {RV_OP_REG, .reg = 0};
+        return emit_branch(a, sec, 1, &o[0], &z, o[1].sym, err);
+    }
+
     if (strcmp(m, "blt") == 0 && n == 3)
         return emit_branch(a, sec, 4, &o[0], &o[1], o[2].sym, err);
     if (strcmp(m, "bge") == 0 && n == 3)

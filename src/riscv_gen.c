@@ -689,6 +689,7 @@ void riscv_generate(IRProgram *prog, RegAllocResult **ra_results, const char *fi
                     fprintf(out, "  call __paninic_push_try_context\n");
                     /* a0 now has the result of setjmp: 0 if first time, non-zero if thrown */
                     fprintf(out, "  bnez a0, %s\n", instr->label);
+                    param_idx = 0;
                     break;
 
                 case IR_TRY_END:

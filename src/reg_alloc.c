@@ -283,7 +283,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **p
             }
 
             /* --- If this is a call, all variables currently in LIVE interfere with caller-saved registers --- */
-            if (instr->kind == IR_CALL || instr->kind == IR_CALL_INDIRECT) {
+            if (instr->kind == IR_CALL || instr->kind == IR_CALL_INDIRECT || instr->kind == IR_TRY_BEGIN || instr->kind == IR_TRY_END || instr->kind == IR_THROW) {
                 for (int j = 0; j < live_count; j++) {
                     int v_idx = ig_get_or_add(ig, live[j]);
                     ig->nodes[v_idx].interferes_with_caller_saved = 1;
