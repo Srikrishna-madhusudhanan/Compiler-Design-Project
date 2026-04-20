@@ -106,6 +106,12 @@ typedef struct {
 
     /* Which callee-saved registers were actually used (must save/restore) */
     int    callee_used[RA_NUM_REGS]; /* 1 if register i was assigned       */
+
+    /* Spill metrics */
+    int    spill_loads;   /* number of IR_ASSIGN spill loads inserted      */
+    int    spill_stores;  /* number of IR_ASSIGN spill stores inserted     */
+    int    max_reg_pressure;
+    int    ig_node_count;
 } RegAllocResult;
 
 /* -----------------------------------------------------------------------

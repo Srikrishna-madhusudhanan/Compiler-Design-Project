@@ -17,7 +17,7 @@ int main() {
         printf("%d", a);
     }
 
-    // A local optimizer won't delete "z = 30" because it doesn't know if 
+    // A local optimizer can't safely delete "z = 30" because it doesn't know if 
     // z is used later in other blocks.
     // A GLOBAL optimizer (DCE) sees z is never used again and deletes it.
     return 0;

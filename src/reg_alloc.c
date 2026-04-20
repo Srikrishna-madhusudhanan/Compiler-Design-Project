@@ -139,9 +139,11 @@ static int is_persisted_spill(const char *name, char **names, int count) {
  *     for each v in LIVE: add edge(r, v)
  *   We compute live sets by walking each basic block backward.
  * ----------------------------------------------------------------------- */
-static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **persisted_spills, int persisted_count) {
+static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **persisted_spills, int persisted_count, int *out_max_pressure) {
     InterferenceGraph *ig = calloc(1, sizeof(InterferenceGraph));
     ig->func_name = strdup(f->name);
+    
+    int max_p = 0;
 
     /* Ensure liveness info is up to date */
     compute_liveness(cfg);
@@ -203,6 +205,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **p
             live = realloc(live, sizeof(char*) * (live_count + 1));
             live[live_count++] = strdup(bb->live_out[i]);
         }
+        if (live_count > max_p) max_p = live_count;
 
         /* Walk instructions backward */
         for (int i = cnt - 1; i >= 0; i--) {
@@ -281,6 +284,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **p
                     live[live_count++] = strdup(ops[j]->name);
                 }
             }
+            if (live_count > max_p) max_p = live_count;
 
             /* --- If this is a call, all variables currently in LIVE interfere with caller-saved registers --- */
             if (instr->kind == IR_CALL || instr->kind == IR_CALL_INDIRECT || instr->kind == IR_TRY_BEGIN || instr->kind == IR_TRY_END || instr->kind == IR_THROW) {
@@ -298,6 +302,7 @@ static InterferenceGraph *build_interference_graph(IRFunc *f, CFG *cfg, char **p
         bb = bb->next;
     }
 
+    if (out_max_pressure) *out_max_pressure = max_p;
     return ig;
 }
 
@@ -452,8 +457,10 @@ static void op_rename(IROperand *op, const char *old, const char *new_name) {
     }
 }
 
-static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
+static int rewrite_spills(IRFunc *f, InterferenceGraph *ig, int *out_spill_loads, int *out_spill_stores) {
     int rewrote = 0;
+    int local_loads = 0;
+    int local_stores = 0;
 
     /* Collect all spilled variable names and their offsets */
     int n_spills = 0;
@@ -524,6 +531,7 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
                 free(t_new);
 
                 prev = load_instr;
+                local_loads++;
                 rewrote = 1;
             }
 
@@ -542,6 +550,7 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
                 instr->next = store_instr;
                 /* DO NOT do `next = store_instr`. That causes an infinite loop by re-evaluating the spill! */
 
+                local_stores++;
                 free(t_def);
                 rewrote = 1;
             }
@@ -556,13 +565,18 @@ static int rewrite_spills(IRFunc *f, InterferenceGraph *ig) {
 
     free(spill_names);
     free(spill_offsets);
+
+    /* Accumulate into output counters */
+    if (out_spill_loads) *out_spill_loads += local_loads;
+    if (out_spill_stores) *out_spill_stores += local_stores;
+
     return rewrote;
 }
 
 /* -----------------------------------------------------------------------
  * Build RegAllocResult from a colored interference graph.
  * ----------------------------------------------------------------------- */
-static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name, char **persisted_names, int *persisted_offsets, int persisted_count) {
+static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name, char **persisted_names, int *persisted_offsets, int persisted_count, int max_p) {
     int total_vars = ig->count + persisted_count;
     RegAllocResult *res = calloc(1, sizeof(RegAllocResult));
     res->func_name  = strdup(func_name);
@@ -570,6 +584,8 @@ static RegAllocResult *build_result(InterferenceGraph *ig, const char *func_name
     res->var_names  = malloc(sizeof(char*) * total_vars);
     res->reg_index  = malloc(sizeof(int)   * total_vars);
     res->spill_offset = malloc(sizeof(int) * total_vars);
+    res->max_reg_pressure = max_p;
+    res->ig_node_count = ig->count;
 
     for (int i = 0; i < ig->count; i++) {
         res->var_names[i]    = strdup(ig->nodes[i].name);
@@ -603,11 +619,15 @@ static RegAllocResult *allocate_function(IRFunc *f) {
     InterferenceGraph *ig   = NULL;
     RegAllocResult    *res  = NULL;
     int                rounds = 0;
+    int total_spill_loads = 0;
+    int total_spill_stores = 0;
 
     /* Persisted spill tracking to prevent infinite loops / recursive rewriting */
     char **persisted_names = NULL;
     int   *persisted_offsets = NULL;
     int    persisted_count = 0;
+    int    abs_max_pressure = 0;
+    int    initial_ig_count = -1;
 
     for (;;) {
         rounds++;
@@ -628,7 +648,10 @@ static RegAllocResult *allocate_function(IRFunc *f) {
 
         /* Phase 1+2: interference graph (ignoring already-spilled variables) */
         if (ig) ig_free(ig);
-        ig = build_interference_graph(f, cfg, persisted_names, persisted_count);
+        int current_max_p = 0;
+        ig = build_interference_graph(f, cfg, persisted_names, persisted_count, &current_max_p);
+        if (current_max_p > abs_max_pressure) abs_max_pressure = current_max_p;
+        if (initial_ig_count == -1) initial_ig_count = ig->count;
         free_cfg(cfg);
 
         if (ig->count == 0) break; /* no variables left to allocate */
@@ -655,7 +678,7 @@ static RegAllocResult *allocate_function(IRFunc *f) {
         }
 
         /* Phase 5: spill rewrite */
-        int changed = rewrite_spills(f, ig);
+        int changed = rewrite_spills(f, ig, &total_spill_loads, &total_spill_stores);
         if (!changed) break; 
 
         /* Safety valve: at most 10 rounds */
@@ -663,7 +686,18 @@ static RegAllocResult *allocate_function(IRFunc *f) {
     }
 
     /* Build the result lookup table (including persisted spills) */
-    res = build_result(ig, f->name, persisted_names, persisted_offsets, persisted_count);
+    res = build_result(ig, f->name, persisted_names, persisted_offsets, persisted_count, abs_max_pressure);
+    if (res) res->ig_node_count = initial_ig_count;
+    
+    /* Store spill metrics */
+    if (res) {
+        res->spill_loads = total_spill_loads;
+        res->spill_stores = total_spill_stores;
+    }
+    if (res) {
+        res->spill_loads = total_spill_loads;
+        res->spill_stores = total_spill_stores;
+    }
 
     /* Phase 6: export DOT and JSON (one per function, last round's graph) */
     char dot_path[128];

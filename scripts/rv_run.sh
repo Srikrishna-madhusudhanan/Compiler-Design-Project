@@ -18,9 +18,7 @@ LIBGCC_DIR="/usr/lib/gcc-cross/riscv64-linux-gnu/13"
 echo "--> Building tools..."
 make -C tools/rvas > /dev/null
 make -C tools/rvld > /dev/null
-if [ ! -x "$PARSER" ]; then
-    make parser > /dev/null
-fi
+make parser > /dev/null
 
 if [ -z "$QEMU" ]; then
     echo "Error: qemu-riscv64 not found." >&2
@@ -33,8 +31,12 @@ if [ $# -lt 1 ]; then
 fi
 
 COMPILER_FLAGS=()
+WANT_METRICS=0
 while [[ $# -gt 0 && "$1" == -* ]]; do
     COMPILER_FLAGS+=("$1")
+    if [ "$1" = "--metrics" ]; then
+        WANT_METRICS=1
+    fi
     shift
 done
 
@@ -75,8 +77,41 @@ echo "--> Linking with custom minilib..."
 
 # 4. Run
 echo -e "--> Executing in QEMU...\n"
-if [ -n "$INPUT" ]; then
-    printf '%s' "$INPUT" | "$QEMU" build/program.elf
+
+# If metrics were requested, also run with instruction tracing
+if [ $WANT_METRICS -eq 1 ] && command -v qemu-riscv64 &> /dev/null; then
+    # Run with instruction trace for dynamic instruction count
+    if [ -n "$INPUT" ]; then
+        printf '%s' "$INPUT" | /usr/bin/time -v "$QEMU" -d in_asm ./build/program.elf 2> /tmp/qemu_trace.txt || true
+    else
+        /usr/bin/time -v "$QEMU" -d in_asm ./build/program.elf 2> /tmp/qemu_trace.txt || true
+    fi
+    
+    # Extract peak memory from time output (which goes to stderr along with qemu trace)
+    if [ -f /tmp/qemu_trace.txt ]; then
+        PEAK_MEM=$(grep "Maximum resident set size" /tmp/qemu_trace.txt | awk '{print $6}')
+        if [ -z "$PEAK_MEM" ]; then PEAK_MEM=0; fi
+        
+        # Count dynamic instructions from trace
+        DYNAMIC_INSTR=$(grep -c "^0x" /tmp/qemu_trace.txt || echo "0")
+        echo -e "\nDynamic instruction count: $DYNAMIC_INSTR"
+        
+        if [ -f compiler_metrics.txt ]; then
+            sed -i "s/Dynamic instructions: *0/Dynamic instructions:          $DYNAMIC_INSTR/" compiler_metrics.txt
+            sed -i "s/Peak memory: *0 KB/Peak memory:                   $PEAK_MEM KB/" compiler_metrics.txt
+        fi
+    fi
 else
-    "$QEMU" build/program.elf
+    # Normal execution without tracing
+    if [ -n "$INPUT" ]; then
+        printf '%s' "$INPUT" | "$QEMU" build/program.elf
+    else
+        "$QEMU" build/program.elf
+    fi
+fi
+
+# Display metrics if generated
+if [ $WANT_METRICS -eq 1 ] && [ -f compiler_metrics.txt ]; then
+    echo -e "\n"
+    cat compiler_metrics.txt
 fi

@@ -311,7 +311,7 @@ static void convert_to_assign(IRInstr *instr, IROperand new_src) {
     instr->src = src_owned;
 }
 
-static int fold_unop(IRInstr *instr) {
+static int fold_unop(IRInstr *instr, CompilerMetrics *metrics) {
     if (instr->kind != IR_UNOP) return 0;
     if (instr->unop_src.is_const) {
         int val = 0;
@@ -324,13 +324,14 @@ static int fold_unop(IRInstr *instr) {
         if (valid) {
             IROperand const_op; const_op.is_const = 1; const_op.const_val = val; const_op.name = NULL;
             convert_to_assign(instr, const_op);
+            if (metrics) metrics->const_folded++;
             return 1;
         }
     }
     return 0;
 }
 
-static int fold_constants(IRInstr *instr) {
+static int fold_constants(IRInstr *instr, CompilerMetrics *metrics) {
     if (instr->kind != IR_BINOP) return 0;
     if (instr->left.is_const && instr->right.is_const) {
         int val = 0;
@@ -366,6 +367,7 @@ static int fold_constants(IRInstr *instr) {
         if (valid) {
             IROperand const_op; const_op.is_const = 1; const_op.const_val = val; const_op.name = NULL;
             convert_to_assign(instr, const_op);
+            if (metrics) metrics->const_folded++;
             return 1;
         }
     }
@@ -493,7 +495,7 @@ static void clear_local_structs(ConstVar *c_list, CopyVar *cp_list, ExprNode *e_
     }
 }
 
-static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, CopyVar **copies) {
+static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, CopyVar **copies, CompilerMetrics *metrics) {
     int changed = 0;
     IROperand *ops[5] = {NULL}; int num_ops = 0;
 
@@ -517,12 +519,14 @@ static int propagate_constants_and_copies(IRInstr *instr, ConstVar **consts, Cop
                 ops[i]->const_val = val;
                 ops[i]->name = NULL;
                 changed = 1;
+                if (metrics) metrics->const_folded++;
             } else if ((cpy = get_copy(*copies, ops[i]->name)) != NULL) {
                 if (ops[i]->name) free(ops[i]->name);
                 ops[i]->name = strdup(cpy);
                 ops[i]->is_const = 0;
                 ops[i]->const_val = 0;
                 changed = 1;
+                if (metrics) metrics->copy_propagated++;
             }
         }
     }
@@ -682,17 +686,17 @@ static void eliminate_dead_stores_local(BasicBlock *bb) {
     }
 }
 
-static void optimize_bb(BasicBlock *bb) {
+static void optimize_bb(BasicBlock *bb, CompilerMetrics *metrics) {
     int changed = 1;
     while (changed) {
         changed = 0;
         ConstVar *consts = NULL; CopyVar *copies = NULL; ExprNode *exprs = NULL;
         IRInstr *curr = bb->instrs;
         while (curr) {
-            changed |= propagate_constants_and_copies(curr, &consts, &copies);
+            changed |= propagate_constants_and_copies(curr, &consts, &copies, metrics);
             changed |= eliminate_cse(curr, &exprs);
-            changed |= fold_constants(curr);
-            changed |= fold_unop(curr);
+            changed |= fold_constants(curr, metrics);
+            changed |= fold_unop(curr, metrics);
             changed |= strength_reduction(curr);
             changed |= peephole_algebraic(curr);
             if (curr == bb->last) break;
@@ -3102,7 +3106,7 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
 
             BasicBlock *bb = cfg->blocks;
             while (bb) {
-                optimize_bb(bb);
+                optimize_bb(bb, metrics);
                 bb = bb->next;
             }
 

@@ -1,5 +1,5 @@
 int main() {
-    intt a;
+    int a;
     a = 10; // Missing semicolon above
     if (a > 5) {
         return a;

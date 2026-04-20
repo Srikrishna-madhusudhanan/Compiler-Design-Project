@@ -60,6 +60,13 @@ $(BUILD_DIR)/%_rv.o: $(SRC_DIR)/%.s
 	$(AS_RISCV) -march=rv64gc -mabi=lp64d -o $@ $<
 
 
+# Header dependencies
+$(BUILD_DIR)/compiler_metrics.o: $(SRC_DIR)/compiler_metrics.c $(SRC_DIR)/compiler_metrics.h
+$(BUILD_DIR)/ir_opt.o: $(SRC_DIR)/ir_opt.c $(SRC_DIR)/ir_opt.h $(SRC_DIR)/compiler_metrics.h
+$(BUILD_DIR)/reg_alloc.o: $(SRC_DIR)/reg_alloc.c $(SRC_DIR)/reg_alloc.h $(SRC_DIR)/ir_opt.h
+$(BUILD_DIR)/riscv_gen.o: $(SRC_DIR)/riscv_gen.c $(SRC_DIR)/riscv_gen.h $(SRC_DIR)/reg_alloc.h
+$(BUILD_DIR)/ir_gen.o: $(SRC_DIR)/ir_gen.c $(SRC_DIR)/ir_gen.h $(SRC_DIR)/ir.h
+
 clean:
 	rm -rf $(BUILD_DIR) ast.dot ir.txt ir_opt.txt output.s compiler_metrics.txt
 	$(MAKE) -C tools/rvas clean

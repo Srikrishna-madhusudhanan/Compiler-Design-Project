@@ -964,8 +964,10 @@ int main(int argc, char **argv) {
             ir_export_to_file(ir, "ir_opt.txt");
 
             if (want_metrics) {
-                metrics.post_opt_ir_instructions = compiler_metrics_count_ir_instructions(ir);
-                metrics.post_opt_basic_blocks = compiler_metrics_count_basic_blocks(ir);
+                compiler_metrics_update_cfg_stats(&metrics, ir);
+                if (metrics.pre_opt_ir_instructions > 0) {
+                    metrics.ir_growth_factor = (double)metrics.post_opt_ir_instructions / metrics.pre_opt_ir_instructions;
+                }
             }
 
             /* Instruction Scheduling */
@@ -992,6 +994,7 @@ int main(int argc, char **argv) {
 
             if (want_metrics) {
                 compiler_metrics_read_assembly_lines(&metrics, "output.s");
+                compiler_metrics_analyze_assembly(&metrics, "output.s");
                 compiler_metrics_print_and_save(&metrics, "compiler_metrics.txt");
             }
 
