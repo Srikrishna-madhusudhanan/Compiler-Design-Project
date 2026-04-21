@@ -34,3 +34,6 @@ tools/rvld/tests/glob_test
 tools/rvld/tests/bubble_sort_final
 tools/rvld/tests/simple_add_full
 tools/rvld/tests/simple_return_test
+
+# Frontend
+gui/node_modules/
