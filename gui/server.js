@@ -16,6 +16,12 @@ app.use('/lib', express.static(path.join(__dirname, 'node_modules')));
 const COMPILER_PATH = './build/parser';
 const ROOT_DIR = path.join(__dirname, '..');
 
+function truncateOutput(text, maxLen = 12000) {
+    if (!text) return text;
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, maxLen)}\n... [truncated ${text.length - maxLen} chars]`;
+}
+
 app.post('/api/compile', (req, res) => {
     const { code, optimizationLevel, useMetrics } = req.body;
     const tempFile = path.join(__dirname, 'temp_input.c');
@@ -135,12 +141,12 @@ app.post('/api/run', (req, res) => {
     
     let command = `${qemuRunScript} --metrics ${tempFile} "${input || ''}"`;
     
-    exec(command, { cwd: ROOT_DIR, timeout: 60000 }, (error, stdout, stderr) => {
+    exec(command, { cwd: ROOT_DIR, timeout: 25000 }, (error, stdout, stderr) => {
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
         
         let result = {
-            stdout,
-            stderr,
+            stdout: truncateOutput(stdout),
+            stderr: truncateOutput(stderr),
             error: error ? error.message : null,
             metrics: ''
         };

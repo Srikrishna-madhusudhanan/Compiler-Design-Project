@@ -1,0 +1,966 @@
+=====================================================
+COMPILER TEST RUNNER - Terminal Output Tests
+=====================================================
+
+Testing: test/basics/arithmetic.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/error_handling.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/invalid_switch.c
+  ✗ FAILED: Unexpected error found
+    Output: Parsing...
+Semantic Error (line 34): Switch expression must be of type int or char
+Semantic Error (line 21): Duplicate case label in switch
+Semantic Error (line 26): Case label must be constant int or char
+Semantic Error (line 34): Multiple default labels in switch
+Semantic analysis failed with 4 errors.
+Parsing Done with 0 errors
+AST Structure:
+FunctionDef: g
+  Return Type:
+    Type (token 259)
+  Params:
+  Body:
+    Block
+FunctionDef: bad_switch
+  Return Type:
+    Type (token 258)
+  Params:
+    Param: x
+      Type:
+        Type (token 258)
+  Body:
+    Block
+      Switch
+        Cond:
+          FuncCall: g
+            Callee:
+              Var: g
+            Args:
+        Cases:
+          Case
+            Expr:
+              Int: 1
+            Body:
+              Assign
+                Var: x
+                Int: 1
+              Break
+          Case
+            Expr:
+              Int: 1
+            Body:
+              Assign
+                Var: x
+                Int: 2
+              Break
+          Case
+            Expr:
+              Var: x
+            Body:
+              Assign
+                Var: x
+                Int: 3
+              Break
+          Default
+            Body:
+              Assign
+                Var: x
+                Int: 4
+              Break
+          Default
+            Body:
+              Assign
+                Var: x
+                Int: 5
+              Break
+      Return
+        Var: x
+
+Testing: test/basics/minimal_main.c
+  ✗ FAILED: Unexpected error found
+    Output: Parsing...
+Semantic Error (line 3): Variable redeclared
+Semantic Error (line 4): Undeclared variable 'b'. Did you mean 'a'?
+Semantic Error (line 6): Non-void function must return a value
+Semantic analysis failed with 3 errors.
+Parsing Done with 0 errors
+AST Structure:
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      VarDecl: a
+        Type (token 258)
+        Initializer:
+          Int: 5
+      VarDecl: a
+        Type (token 258)
+        Initializer:
+          Int: 4
+      Assign
+        Var: a
+        BinOp: -
+          Var: b
+          Int: 3
+      VarDecl: c
+        Type (token 260)
+        Initializer:
+          Char: x (120)
+
+Testing: test/basics/multi_declaration.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/nested_arithmetic.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/reg_allocation.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/relop.c
+  ✗ FAILED: Unexpected error found
+    Output: Parsing...
+Semantic Error (line 1): Undeclared variable 'a'. Did you mean 's'?
+Semantic Error (line 1): Undeclared variable 'b'. Did you mean 's'?
+Semantic Error (line 1): Undeclared variable 'c'. Did you mean 's'?
+Semantic Error (line 1): Undeclared variable 'd'. Did you mean 's'?
+Semantic Error (line 1): Type mismatch in initialization
+Semantic analysis failed with 5 errors.
+Parsing Done with 0 errors
+AST Structure:
+VarDecl: s
+  Type (token 260)
+  Initializer:
+    BinOp: &&
+      BinOp: %
+        Var: a
+        Var: b
+      BinOp: !=
+        Var: c
+        Var: d
+
+Testing: test/basics/simple_add.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/simple_return.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/sub.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/basics/variable_init.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/complex/bubble_sort.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/complex/factorial_iterative.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/complex/factorial_recursive.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/complex/factorial_tail_recursive.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/complex/matrix_multiply.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/exception_test.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/arrays.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/const_test.c
+  ✗ FAILED: Unexpected error found
+    Output: Parsing...
+Semantic Error (line 7): Assignment to const variable
+Semantic analysis failed with 1 errors.
+Parsing Done with 0 errors
+AST Structure:
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      VarDecl: MAX
+        Type (token 258)
+        Initializer:
+          Int: 10
+      VarDecl: x
+        Type (token 258)
+        Initializer:
+          Var: MAX
+      VarDecl: y
+        Type (token 258)
+        Initializer:
+          BinOp: +
+            Var: x
+            Int: 1
+      Assign
+        Var: MAX
+        Int: 20
+      Return
+        Int: 0
+
+Testing: test/features/control_flow.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/diagnostic_missing_semicolon_regression.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 3, column 11 (token: return)
+Hint: it looks like you may have forgotten a semicolon before 'return'.
+Parsing...
+Parsing Done with 1 errors
+AST Structure:
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      VarDecl: x
+        Initializer:
+          Int: 5
+      Return
+        Var: x
+
+Testing: test/features/diagnostic_typo_printf_regression.c
+  ✗ FAILED: Unexpected error found
+    Output: Parsing...
+Semantic Error (line 3): Undeclared function 'prinft'. Did you mean 'printf'?
+Semantic analysis failed with 1 errors.
+Parsing Done with 0 errors
+AST Structure:
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      VarDecl: x
+        Type (token 258)
+        Initializer:
+          Int: 42
+      FuncCall: prinft
+        Callee:
+          Var: prinft
+        Args:
+          String: "%d"
+          Var: x
+      Return
+        Int: 0
+
+Testing: test/features/for_decl_inc.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/function_calls.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/instruction_scheduling.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/io.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/ive_verify.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/malloc_arrays.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/malloc_basic.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/malloc_void_ptr.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/pointers.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/scopes.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/struct_pointers.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/structs.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/switch_stmt.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/typedef_alias_regression.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/features/vla.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/oop/access_modifiers.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 11, column 11 (token: b)
+Parsing...
+Parsing Done with 1 errors
+AST Structure:
+StructDef: Base
+  Members:
+    AccessSpec: private
+    VarDecl: secret
+      Type (token 258)
+    AccessSpec: public
+    FunctionDef: set
+      Return Type:
+        Type (token 259)
+      Params:
+        Param: s
+          Type:
+            Type (token 258)
+      Body:
+        Block
+          Assign
+            Var: secret
+            Var: s
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      Unknown Node
+      FuncCall: <dynamic>
+        Callee:
+          MemberAccess: set
+            Base:
+              Var: b
+        Args:
+          Int: 10
+      Assign
+        MemberAccess: secret
+          Base:
+            Var: b
+        Int: 20
+      Return
+        Int: 0
+
+Testing: test/oop/bst.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 4, column 10 (token: *)
+Parser Error: syntax error at line 5, column 9 (token: Node)
+Parser Error: syntax error at line 7, column 9 (token: Node)
+Parser Error: syntax error at line 9, column 13 (token: left)
+Parser Error: syntax error at line 10, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 15, column 10 (token: *)
+Parser Error: syntax error at line 18, column 9 (token: Node)
+Parser Error: syntax error at line 22, column 11 (token: if)
+Hint: it looks like you may have forgotten a semicolon before 'if'.
+Parser Error: syntax error at line 24, column 13 (token: else)
+Hint: it looks like you may have forgotten a semicolon before 'else'.
+Parser Error: syntax error at line 27, column 15 (token: return)
+Hint: it looks like you may have forgotten a semicolon before 'return'.
+Parser Error: syntax error at line 28, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 34, column 16 (token: inorder)
+Parser Error: syntax error at line 35, column 15 (token: printf)
+Hint: it looks like you may have forgotten a semicolon before 'printf'.
+Parser Error: syntax error at line 36, column 16 (token: inorder)
+Parser Error: syntax error at line 37, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 44, column 11 (token: if)
+Hint: it looks like you may have forgotten a semicolon before 'if'.
+Parser Error: syntax error at line 46, column 13 (token: else)
+Hint: it looks like you may have forgotten a semicolon before 'else'.
+Parser Error: syntax error at line 48, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 53, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 57, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 61, column 16 (token: inorder)
+Parser Error: syntax error at line 62, column 15 (token: printf)
+Hint: it looks like you may have forgotten a semicolon before 'printf'.
+Parser Error: syntax error at line 63, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 67, column 11 (token: if)
+Hint: it looks like you may have forgotten a semicolon before 'if'.
+Parser Error: syntax error at line 69, column 13 (token: else)
+Hint: it looks like you may have forgotten a semicolon before 'else'.
+Parser Error: syntax error at line 71, column 6 (token: })
+Hint: it looks like you may have forgotten a semicolon before '}'.
+Parser Error: syntax error at line 75, column 13 (token: tree)
+Hint: 'tree' looks similar to keyword 'try'.
+Parsing...
+Parsing Done with 27 errors
+AST Structure:
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      Unknown Node
+      VarDecl: choice
+        Type (token 258)
+      VarDecl: val
+        Type (token 258)
+      While
+        Cond:
+          Int: 1
+        Body:
+          Block
+            Printf
+              Format:
+                String: "\n1. Insert\n2. Display (Inorder)\n3. Search\n4. Exit\n"
+              Args:
+            Printf
+              Format:
+                String: "Enter choice: "
+              Args:
+            Scanf
+              Format:
+                String: "%d"
+              Args:
+                UnOp: &
+                  Var: choice
+            Switch
+              Cond:
+                Var: choice
+              Cases:
+                Case
+                  Expr:
+                    Int: 1
+                  Body:
+                    Printf
+                      Format:
+                        String: "Enter value to insert: "
+                      Args:
+                    Scanf
+                      Format:
+                        String: "%d"
+                      Args:
+                        UnOp: &
+                          Var: val
+                    FuncCall: <dynamic>
+                      Callee:
+                        MemberAccess: insert
+                          Base:
+                            Var: tree
+                      Args:
+                        Var: val
+                    Break
+                Case
+                  Expr:
+                    Int: 2
+                  Body:
+                    FuncCall: <dynamic>
+                      Callee:
+                        MemberAccess: display
+                          Base:
+                            Var: tree
+                      Args:
+                    Break
+                Case
+                  Expr:
+                    Int: 3
+                  Body:
+                    Printf
+                      Format:
+                        String: "Enter value to search: "
+                      Args:
+                    Scanf
+                      Format:
+                        String: "%d"
+                      Args:
+                        UnOp: &
+                          Var: val
+                    FuncCall: <dynamic>
+                      Callee:
+                        MemberAccess: find
+                          Base:
+                            Var: tree
+                      Args:
+                        Var: val
+                    Break
+                Case
+                  Expr:
+                    Int: 4
+                  Body:
+                    Return
+                      Int: 0
+                Default
+                  Body:
+                    Printf
+                      Format:
+                        String: "Invalid choice!\n"
+                      Args:
+      Return
+        Int: 0
+
+Testing: test/oop/classes.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/oop/constructors.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 16, column 12 (token: s)
+Parsing...
+Parsing Done with 1 errors
+AST Structure:
+StructDef: Stack
+  Members:
+    AccessSpec: private
+    AccessSpec: public
+    VarDecl: top
+      Type (token 258)
+    FunctionDef: Stack
+      Return Type:
+        Type (token 259)
+      Params:
+      Body:
+        Block
+          Assign
+            Var: top
+            Int: 0
+    FunctionDef: Stack
+      Return Type:
+        Type (token 259)
+      Params:
+      Body:
+        Block
+          Assign
+            Var: top
+            UnOp: -
+              Int: 1
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      Unknown Node
+      Return
+        Int: 0
+
+Testing: test/oop/method_overloading.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 18, column 17 (token: c)
+Parsing...
+Parsing Done with 1 errors
+AST Structure:
+StructDef: Calculator
+  Members:
+    AccessSpec: private
+    VarDecl: x
+      Type (token 258)
+    AccessSpec: public
+    FunctionDef: Calculator
+      Return Type:
+        Type (token 259)
+      Params:
+      Body:
+        Block
+          Printf
+            Format:
+              String: "Calculator created\n"
+            Args:
+          Assign
+            Var: x
+            Int: 8
+    FunctionDef: add
+      Return Type:
+        Type (token 258)
+      Params:
+        Param: x
+          Type:
+            Type (token 258)
+        Param: y
+          Type:
+            Type (token 258)
+      Body:
+        Block
+          Return
+            BinOp: +
+              Var: x
+              Var: y
+    FunctionDef: add
+      Return Type:
+        Type (token 258)
+      Params:
+        Param: x
+          Type:
+            Type (token 258)
+      Body:
+        Block
+          Return
+            BinOp: +
+              Var: x
+              Int: 1
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      Unknown Node
+      VarDecl: a
+        Type (token 258)
+        Initializer:
+          FuncCall: <dynamic>
+            Callee:
+              MemberAccess: add
+                Base:
+                  Var: c
+            Args:
+              Int: 10
+              Int: 20
+      VarDecl: b
+        Type (token 258)
+        Initializer:
+          FuncCall: <dynamic>
+            Callee:
+              MemberAccess: add
+                Base:
+                  Var: c
+            Args:
+              Int: 5
+      Printf
+        Format:
+          String: "a = %d\n"
+        Args:
+          Var: a
+      Printf
+        Format:
+          String: "b = %d\n"
+        Args:
+          Var: b
+      Return
+        Int: 0
+
+Testing: test/oop/polymorphism_demo.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 17, column 14 (token: d)
+Parsing...
+Parsing Done with 1 errors
+AST Structure:
+StructDef: Base
+  Members:
+    AccessSpec: public
+    FunctionDef: show
+      Return Type:
+        Type (token 259)
+      Params:
+      Body:
+        Block
+          Printf
+            Format:
+              String: "Base class\n"
+            Args:
+StructDef: Derived
+  Base Class: Base
+  Members:
+    AccessSpec: public
+    FunctionDef: show
+      Return Type:
+        Type (token 259)
+      Params:
+      Body:
+        Block
+          Printf
+            Format:
+              String: "Derived class\n"
+            Args:
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      BinOp: *
+        Var: Base
+        Var: b
+      Unknown Node
+      Assign
+        Var: b
+        UnOp: &
+          Var: d
+      FuncCall: <dynamic>
+        Callee:
+          MemberAccess: show
+            Base:
+              Var: b
+        Args:
+      Return
+        Int: 0
+
+Testing: test/oop/stack.c
+  ✗ FAILED: Unexpected error found
+    Output: Parser Error: syntax error at line 55, column 12 (token: s)
+Parsing...
+Parsing Done with 1 errors
+AST Structure:
+VarDecl: MAX
+  Type (token 258)
+  Initializer:
+    Int: 100
+StructDef: Stack
+  Members:
+    AccessSpec: private
+    VarDecl: arr [expr]
+      Type (token 258)
+    VarDecl: top
+      Type (token 258)
+    AccessSpec: public
+    FunctionDef: Stack
+      Return Type:
+        Type (token 259)
+      Params:
+      Body:
+        Block
+          Assign
+            Var: top
+            UnOp: -
+              Int: 1
+    FunctionDef: push
+      Return Type:
+        Type (token 258)
+      Params:
+        Param: x
+          Type:
+            Type (token 258)
+      Body:
+        Block
+          If
+            Cond:
+              BinOp: >=
+                Var: top
+                BinOp: -
+                  Var: MAX
+                  Int: 1
+            Then:
+              Block
+                Printf
+                  Format:
+                    String: "Stack overflow!\n"
+                  Args:
+                Return
+                  Int: 0
+            Else:
+              Block
+                Assign
+                  Index
+                    Base:
+                      Var: arr
+                    Index Expr:
+                      PreInc
+                        Var: top
+                  Var: x
+                Printf
+                  Format:
+                    String: "%d pushed into the stack\n"
+                  Args:
+                    Var: x
+                Return
+                  Int: 1
+    FunctionDef: pop
+      Return Type:
+        Type (token 258)
+      Params:
+      Body:
+        Block
+          If
+            Cond:
+              BinOp: <
+                Var: top
+                Int: 0
+            Then:
+              Block
+                Printf
+                  Format:
+                    String: "Stack underflow!\n"
+                  Args:
+                Return
+                  Int: 0
+            Else:
+              Block
+                VarDecl: x
+                  Type (token 258)
+                  Initializer:
+                    Index
+                      Base:
+                        Var: arr
+                      Index Expr:
+                        PostDec
+                          Var: top
+                Return
+                  Var: x
+    FunctionDef: peek
+      Return Type:
+        Type (token 258)
+      Params:
+      Body:
+        Block
+          If
+            Cond:
+              BinOp: <
+                Var: top
+                Int: 0
+            Then:
+              Block
+                Printf
+                  Format:
+                    String: "Stack is Empty\n"
+                  Args:
+                Return
+                  Int: 0
+            Else:
+              Block
+                Return
+                  Index
+                    Base:
+                      Var: arr
+                    Index Expr:
+                      Var: top
+    FunctionDef: isEmpty
+      Return Type:
+        Type (token 258)
+      Params:
+      Body:
+        Block
+          Return
+            BinOp: <
+              Var: top
+              Int: 0
+FunctionDef: main
+  Return Type:
+    Type (token 258)
+  Params:
+  Body:
+    Block
+      Unknown Node
+      FuncCall: <dynamic>
+        Callee:
+          MemberAccess: push
+            Base:
+              Var: s
+        Args:
+          Int: 10
+      FuncCall: <dynamic>
+        Callee:
+          MemberAccess: push
+            Base:
+              Var: s
+        Args:
+          Int: 20
+      FuncCall: <dynamic>
+        Callee:
+          MemberAccess: push
+            Base:
+              Var: s
+        Args:
+          Int: 30
+      VarDecl: x
+        Type (token 258)
+        Initializer:
+          FuncCall: <dynamic>
+            Callee:
+              MemberAccess: pop
+                Base:
+                  Var: s
+            Args:
+      Printf
+        Format:
+          String: "%d popped from the stack\n"
+        Args:
+          Var: x
+      Assign
+        Var: x
+        FuncCall: <dynamic>
+          Callee:
+            MemberAccess: pop
+              Base:
+                Var: s
+          Args:
+      Printf
+        Format:
+          String: "%d popped from the stack\n"
+        Args:
+          Var: x
+      Printf
+        Format:
+          String: "The top element is %d\n"
+        Args:
+          FuncCall: <dynamic>
+            Callee:
+              MemberAccess: peek
+                Base:
+                  Var: s
+            Args:
+      Return
+        Int: 0
+
+Testing: test/oop/virtual_methods.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/cse.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/dce_test.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/global_vs_local.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/if_folding.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/licm_array.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/licm_call.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/licm_load.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/licm_side_effect.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/licm_test.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/local_opts.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/loop_unroll.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/loop_unroll_large.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/loop_unroll_multiblock.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/loop_unroll_non_unit_step.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/nested_loops.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/optimizations/ssa_test.c
+  ✓ PASSED: No errors (as expected)
+
+Testing: test/spill_test.c
+  ✓ PASSED: No errors (as expected)
+
+=====================================================
+TEST SUMMARY
+=====================================================
+Total Tests: 63
+Passed:      51
+Failed:      12
+=====================================================

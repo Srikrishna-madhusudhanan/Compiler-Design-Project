@@ -76,6 +76,32 @@ function log(msg, type = 'info') {
     terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
+function clearTerminal() {
+    terminalOutput.innerHTML = '';
+}
+
+function getBenchmarkInput(code) {
+    // Heuristic for menu-driven interactive programs (like BST demo): choose Exit immediately.
+    if (/while\s*\(\s*1\s*\)/.test(code) && /scanf\s*\(/.test(code) && /case\s+4\s*:/.test(code)) {
+        return '4\n';
+    }
+    return '';
+}
+
+function summarizeOutput(text, maxLen = 1500) {
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, maxLen)}\n... [truncated ${text.length - maxLen} chars]`;
+}
+
+function compactRunOutput(text) {
+    if (!text) return '';
+    const marker = '--> Executing in QEMU...';
+    const idx = text.indexOf(marker);
+    const runtimeSlice = idx >= 0 ? text.slice(idx + marker.length).trim() : text;
+    return summarizeOutput(runtimeSlice);
+}
+
 // Load Examples
 async function loadExamples() {
     try {
@@ -606,6 +632,7 @@ funcSelect.addEventListener('change', () => {
 
 runBtn.addEventListener('click', async () => {
     if (!editor.value.trim()) { log('No code to run. Write or load a program first.', 'warning'); return; }
+    clearTerminal();
     log('Running Benchmarks with QEMU...', 'info');
     runBtn.disabled = true;
     const origLabel = runBtn.textContent;
@@ -614,18 +641,26 @@ runBtn.addEventListener('click', async () => {
     // Countdown shown on button
     let seconds = 0;
     const timer = setInterval(() => { seconds++; runBtn.textContent = `⏳ Running... ${seconds}s`; }, 1000);
+    const inferredInput = getBenchmarkInput(editor.value);
+    if (inferredInput) {
+        log('Auto input applied for menu-driven program: "4" (Exit)', 'info');
+    }
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 30000);
 
     try {
         const response = await fetch('/api/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: editor.value, input: "" })
+            body: JSON.stringify({ code: editor.value, input: inferredInput }),
+            signal: controller.signal
         });
         clearInterval(timer);
+        clearTimeout(fetchTimeout);
         const data = await response.json();
 
-        if (data.stdout) log('Program output: ' + data.stdout, 'success');
-        if (data.stderr) log('Stderr: ' + data.stderr, 'warning');
+        if (data.stdout) log('Program output: ' + compactRunOutput(data.stdout), 'success');
+        if (data.stderr) log('Stderr: ' + summarizeOutput(data.stderr), 'warning');
         if (data.error) {
             if (data.error.includes('killed') || data.error.includes('SIGTERM')) {
                 log('⚠️ Program killed — exceeded 60s timeout (infinite loop?)', 'error');
@@ -643,7 +678,12 @@ runBtn.addEventListener('click', async () => {
         }
     } catch (e) {
         clearInterval(timer);
-        log('Run failed or timed out: ' + e.message, 'error');
+        clearTimeout(fetchTimeout);
+        if (e.name === 'AbortError') {
+            log('Run cancelled after 30s client timeout.', 'error');
+        } else {
+            log('Run failed or timed out: ' + e.message, 'error');
+        }
     } finally {
         clearInterval(timer);
         runBtn.disabled = false;

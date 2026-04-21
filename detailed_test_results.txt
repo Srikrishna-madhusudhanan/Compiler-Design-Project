@@ -1,0 +1,146 @@
+=====================================================
+DETAILED COMPILER TEST REPORT
+=====================================================
+
+INTENTIONAL ERROR TESTS
+=====================================================  
+Testing: test/basics/invalid_switch.c
+  ✓ Correctly detected error
+    Error: Semantic Error (line 34): Switch expression must be of type int or char
+
+Testing: test/basics/minimal_main.c
+  ✓ Correctly detected error
+    Error: Semantic Error (line 3): Variable redeclared
+
+Testing: test/basics/relop.c
+  ✓ Correctly detected error
+    Error: Semantic Error (line 1): Undeclared variable 'a'. Did you mean 's'?
+
+Testing: test/features/const_test.c
+  ✓ Correctly detected error
+    Error: Semantic Error (line 7): Assignment to const variable
+
+Testing: test/features/diagnostic_missing_semicolon_regression.c
+  ✓ Correctly detected error
+    Error: Parser Error: syntax error at line 3, column 11 (token: return)
+
+Testing: test/features/diagnostic_typo_printf_regression.c
+  ✓ Correctly detected error
+    Error: Semantic Error (line 3): Undeclared function 'prinft'. Did you mean 'printf'?
+
+
+KNOWN UNSUPPORTED/OOP TESTS
+====================================================
+Testing: test/oop/access_modifiers.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/bst.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/classes.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/constructors.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/method_overloading.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/polymorphism_demo.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/stack.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+Testing: test/oop/virtual_methods.c (OOP feature)
+  ℹ Error (expected for unsupported OOP)
+
+
+REGULAR TEST FILES (SHOULD PASS)
+====================================================
+  ✓ ./test/basics/arithmetic.c
+  ✓ ./test/basics/error_handling.c
+  ✗ ./test/basics/invalid_switch.c (unexpected error)
+  ✗ ./test/basics/invalid_switch.c (unexpected error)
+  ✗ ./test/basics/minimal_main.c (unexpected error)
+  ✗ ./test/basics/minimal_main.c (unexpected error)
+  ✓ ./test/basics/multi_declaration.c
+  ✓ ./test/basics/nested_arithmetic.c
+  ✓ ./test/basics/reg_allocation.c
+  ✗ ./test/basics/relop.c (unexpected error)
+  ✗ ./test/basics/relop.c (unexpected error)
+  ✓ ./test/basics/simple_add.c
+  ✓ ./test/basics/simple_return.c
+  ✓ ./test/basics/sub.c
+  ✓ ./test/basics/variable_init.c
+  ✓ ./test/complex/bubble_sort.c
+  ✓ ./test/complex/factorial_iterative.c
+  ✓ ./test/complex/factorial_recursive.c
+  ✓ ./test/complex/factorial_tail_recursive.c
+  ✓ ./test/complex/matrix_multiply.c
+  ✓ ./test/exception_test.c
+  ✓ ./test/features/arrays.c
+  ✗ ./test/features/const_test.c (unexpected error)
+  ✗ ./test/features/const_test.c (unexpected error)
+  ✓ ./test/features/control_flow.c
+  ✗ ./test/features/diagnostic_missing_semicolon_regression.c (unexpected error)
+  ✗ ./test/features/diagnostic_missing_semicolon_regression.c (unexpected error)
+  ✗ ./test/features/diagnostic_typo_printf_regression.c (unexpected error)
+  ✗ ./test/features/diagnostic_typo_printf_regression.c (unexpected error)
+  ✓ ./test/features/for_decl_inc.c
+  ✓ ./test/features/function_calls.c
+  ✓ ./test/features/instruction_scheduling.c
+  ✓ ./test/features/io.c
+  ✓ ./test/features/ive_verify.c
+  ✓ ./test/features/malloc_arrays.c
+  ✓ ./test/features/malloc_basic.c
+  ✓ ./test/features/malloc_void_ptr.c
+  ✓ ./test/features/pointers.c
+  ✓ ./test/features/scopes.c
+  ✓ ./test/features/struct_pointers.c
+  ✓ ./test/features/structs.c
+  ✓ ./test/features/switch_stmt.c
+  ✓ ./test/features/typedef_alias_regression.c
+  ✓ ./test/features/vla.c
+  ✗ ./test/oop/access_modifiers.c (unexpected error)
+  ✗ ./test/oop/access_modifiers.c (unexpected error)
+  ✗ ./test/oop/bst.c (unexpected error)
+  ✗ ./test/oop/bst.c (unexpected error)
+  ✓ ./test/oop/classes.c
+  ✗ ./test/oop/constructors.c (unexpected error)
+  ✗ ./test/oop/constructors.c (unexpected error)
+  ✗ ./test/oop/method_overloading.c (unexpected error)
+  ✗ ./test/oop/method_overloading.c (unexpected error)
+  ✗ ./test/oop/polymorphism_demo.c (unexpected error)
+  ✗ ./test/oop/polymorphism_demo.c (unexpected error)
+  ✗ ./test/oop/stack.c (unexpected error)
+  ✗ ./test/oop/stack.c (unexpected error)
+  ✓ ./test/oop/virtual_methods.c
+  ✓ ./test/optimizations/cse.c
+  ✓ ./test/optimizations/dce_test.c
+  ✓ ./test/optimizations/global_vs_local.c
+  ✓ ./test/optimizations/if_folding.c
+  ✓ ./test/optimizations/licm_array.c
+  ✓ ./test/optimizations/licm_call.c
+  ✓ ./test/optimizations/licm_load.c
+  ✓ ./test/optimizations/licm_side_effect.c
+  ✓ ./test/optimizations/licm_test.c
+  ✓ ./test/optimizations/local_opts.c
+  ✓ ./test/optimizations/loop_unroll.c
+  ✓ ./test/optimizations/loop_unroll_large.c
+  ✓ ./test/optimizations/loop_unroll_multiblock.c
+  ✓ ./test/optimizations/loop_unroll_non_unit_step.c
+  ✓ ./test/optimizations/nested_loops.c
+  ✓ ./test/optimizations/ssa_test.c
+  ✓ ./test/spill_test.c
+
+=====================================================
+SUMMARY
+=====================================================
+Total Unique Test Files: 14
+Intentional Error Tests (✓): 6
+Unsupported OOP Files: 8
+FALSE POSITIVES (with misleading hints): 0
+Regular Tests Passing: 0
+Regular Tests Failing: 0
+=====================================================

@@ -443,7 +443,8 @@ void analyze_struct_def(ASTNode *node) {
                 ASTNode *this_param = create_node(NODE_PARAM);
                 this_param->str_val = strdup("this");
                 this_param->left = this_type;
-                this_param->pointer_level = 1;
+                /* Pointer level is carried by this_type->pointer_level. */
+                this_param->pointer_level = 0;
                 this_param->line_number = member->line_number;
                 
                 this_param->next = member->params;
@@ -1103,6 +1104,24 @@ void analyze_function_call(ASTNode *node) {
             node->left->data_type = callee->type;
             node->left->pointer_level = callee->pointer_level;
             node->left->struct_def = callee->struct_def;
+        } else if (current_function && current_function->defining_struct) {
+            /* Unqualified call inside a class method: resolve as implicit this->method(...) */
+            Symbol *cls = current_function->defining_struct;
+            Symbol *m = find_struct_member(cls, node->left->str_val);
+            if (m && m->kind == SYM_FUNCTION) {
+                ASTNode *this_node = create_node(NODE_VAR);
+                this_node->str_val = strdup("this");
+                this_node->line_number = node->line_number;
+
+                ASTNode *member = create_node(NODE_MEMBER_ACCESS);
+                member->line_number = node->line_number;
+                member->left = this_node;
+                member->str_val = strdup(node->left->str_val);
+                member->int_val = 1; /* arrow */
+
+                node->left = member;
+                analyze_node(node->left);
+            }
         }
     } else {
         analyze_node(node->left);

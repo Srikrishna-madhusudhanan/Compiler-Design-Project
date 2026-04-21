@@ -175,6 +175,7 @@ static int token_can_start_statement(const char *tok) {
 %type <node> argument_expression_list
 %type <node> try_statement catch_clause_list catch_clause throw_statement
 %type <node> struct_specifier struct_declaration_list struct_member class_specifier
+%type <str> class_head
 
 %%
 
@@ -468,65 +469,77 @@ type_specifier: T_INT { $$ = create_type_node(T_INT); }
                ;
 
 struct_specifier
-    : T_STRUCT T_IDENT '{' struct_declaration_list '}' {
+    : T_STRUCT T_IDENT {
+        /* Make struct tag visible as a type while parsing its body. */
+        parser_register_typedef_name($2);
+    } '{' struct_declaration_list '}' {
         ASTNode *node = create_node(NODE_STRUCT_DEF);
         SET_LINE(node);
         node->str_val = strdup($2);             /* struct tag */
-        node->body = $4;                        /* member declarations */
+        node->body = $5;                        /* member declarations */
         $$ = node;
     }
     | T_STRUCT T_IDENT {
         /* Struct type reference (no definition)
          * We create a NODE_TYPE with int_val = T_STRUCT and str_val = tag.
          */
+        parser_register_typedef_name($2);
         ASTNode *node = create_type_node(T_STRUCT);
         node->str_val = strdup($2);
         $$ = node;
     }
     ;
 
+class_head
+    : T_CLASS T_IDENT {
+        /* Make class tag visible as a type while parsing its body. */
+        parser_register_typedef_name($2);
+        $$ = $2;
+    }
+    ;
+
 class_specifier
-    : T_CLASS T_IDENT '{' struct_declaration_list '}' {
+    : class_head '{' struct_declaration_list '}' {
         ASTNode *node = create_node(NODE_STRUCT_DEF);
         SET_LINE(node);
-        node->str_val = strdup($2);
-        node->body = $4;
+        node->str_val = strdup($1);
+        node->body = $3;
         node->is_class = 1;
         $$ = node;
     }
-    | T_CLASS T_IDENT T_COLON T_PUBLIC T_IDENT '{' struct_declaration_list '}' {
+    | class_head T_COLON T_PUBLIC T_IDENT '{' struct_declaration_list '}' {
         ASTNode *node = create_node(NODE_STRUCT_DEF);
         SET_LINE(node);
-        node->str_val = strdup($2);
-        node->base_class_name = strdup($5);
-        node->body = $7;
+        node->str_val = strdup($1);
+        node->base_class_name = strdup($4);
+        node->body = $6;
         node->is_class = 1;
         node->inheritance_modifier = 0; /* public */
         $$ = node;
     }
-    | T_CLASS T_IDENT T_COLON T_PRIVATE T_IDENT '{' struct_declaration_list '}' {
+    | class_head T_COLON T_PRIVATE T_IDENT '{' struct_declaration_list '}' {
         ASTNode *node = create_node(NODE_STRUCT_DEF);
         SET_LINE(node);
-        node->str_val = strdup($2);
-        node->base_class_name = strdup($5);
-        node->body = $7;
+        node->str_val = strdup($1);
+        node->base_class_name = strdup($4);
+        node->body = $6;
         node->is_class = 1;
         node->inheritance_modifier = 1; /* private */
         $$ = node;
     }
-    | T_CLASS T_IDENT T_COLON T_IDENT '{' struct_declaration_list '}' {
+    | class_head T_COLON T_IDENT '{' struct_declaration_list '}' {
         ASTNode *node = create_node(NODE_STRUCT_DEF);
         SET_LINE(node);
-        node->str_val = strdup($2);
-        node->base_class_name = strdup($4);
-        node->body = $6;
+        node->str_val = strdup($1);
+        node->base_class_name = strdup($3);
+        node->body = $5;
         node->is_class = 1;
         node->inheritance_modifier = 1; /* DEFAULT private for class */
         $$ = node;
     }
-    | T_CLASS T_IDENT {
+    | class_head {
         ASTNode *node = create_type_node(T_CLASS);
-        node->str_val = strdup($2);
+        node->str_val = strdup($1);
         $$ = node;
     }
     ;
@@ -550,14 +563,32 @@ struct_member
         $$->is_constructor = 1;
         SET_LINE($$);
     }
+    | T_TYPE_NAME '(' parameter_list ')' compound_statement {
+        /* Constructor with params where class name lexes as type name */
+        $$ = create_func_def(create_type_node(T_VOID), $1, $3, $5);
+        $$->is_constructor = 1;
+        SET_LINE($$);
+    }
     | T_IDENT '(' ')' compound_statement {
         /* Constructor without params */
         $$ = create_func_def(create_type_node(T_VOID), $1, NULL, $4);
         $$->is_constructor = 1;
         SET_LINE($$);
     }
+    | T_TYPE_NAME '(' ')' compound_statement {
+        /* Constructor without params where class name lexes as type name */
+        $$ = create_func_def(create_type_node(T_VOID), $1, NULL, $4);
+        $$->is_constructor = 1;
+        SET_LINE($$);
+    }
     | T_TILDE T_IDENT '(' ')' compound_statement {
         /* Destructor */
+        $$ = create_func_def(create_type_node(T_VOID), $2, NULL, $5);
+        $$->is_destructor = 1;
+        SET_LINE($$);
+    }
+    | T_TILDE T_TYPE_NAME '(' ')' compound_statement {
+        /* Destructor where class name lexes as type name */
         $$ = create_func_def(create_type_node(T_VOID), $2, NULL, $5);
         $$->is_destructor = 1;
         SET_LINE($$);
@@ -956,7 +987,19 @@ unary_expression
         $$->str_val = strdup($2);
         $$->params = $4;
     }
+    | T_NEW T_TYPE_NAME '(' argument_expression_list ')' {
+        $$ = create_node(NODE_NEW);
+        SET_LINE($$);
+        $$->str_val = strdup($2);
+        $$->params = $4;
+    }
     | T_NEW T_IDENT '(' ')' {
+        $$ = create_node(NODE_NEW);
+        SET_LINE($$);
+        $$->str_val = strdup($2);
+        $$->params = NULL;
+    }
+    | T_NEW T_TYPE_NAME '(' ')' {
         $$ = create_node(NODE_NEW);
         SET_LINE($$);
         $$->str_val = strdup($2);
@@ -964,6 +1007,13 @@ unary_expression
     }
     | T_NEW T_IDENT {
         /* Support for 'new int' etc. without parens */
+        $$ = create_node(NODE_NEW);
+        SET_LINE($$);
+        $$->str_val = strdup($2);
+        $$->params = NULL;
+    }
+    | T_NEW T_TYPE_NAME {
+        /* Support for 'new Type' where Type lexes as type name */
         $$ = create_node(NODE_NEW);
         SET_LINE($$);
         $$->str_val = strdup($2);
@@ -1004,18 +1054,57 @@ argument_expression_list
 
 int parse_errors = 0;
 
+static int is_likely_false_positive_hint(const char *tok, const char *keyword) {
+    if (!tok || !keyword) return 0;
+    
+    int tok_len = strlen(tok);
+    int kw_len = strlen(keyword);
+    
+    /* 1-3 character identifiers matching to keywords of different length
+     * are likely class/method names, not typos */
+    if (tok_len <= 3 && kw_len != tok_len) {
+        return 1;
+    }
+    
+    /* Identifiers up to 5 characters that are 1-2 chars different from keywords
+     * are likely legitimate names, not typos */
+    if (tok_len <= 5) {
+        int len_diff = (tok_len > kw_len) ? (tok_len - kw_len) : (kw_len - tok_len);
+        if (len_diff <= 2) {
+            /* This might be a false positive - a real typo would typically affect
+             * the middle characters, not just length difference */
+            return 1;
+        }
+    }
+    
+    /* Single character tokens are rarely typos */
+    if (tok_len == 1) {
+        return 1;
+    }
+    
+    return 0;
+}
+
 void yyerror(const char *s) {
     fprintf(stderr, "Parser Error: %s at line %d, column %d (token: %s)\n", s, line_num, col_num, yytext);
 
+    /* First priority: check if missing semicolon */
     if (token_can_start_statement(yytext)) {
         fprintf(stderr, "Hint: it looks like you may have forgotten a semicolon before '%s'.\n", yytext);
     }
-
-    if (is_identifier_text(yytext)) {
+    /* Second priority: check for keyword similarity, but filter out false positives */
+    else if (is_identifier_text(yytext)) {
         int dist = 999;
         const char *kw = closest_keyword(yytext, &dist);
         if (kw && dist > 0 && dist <= 2) {
-            fprintf(stderr, "Hint: '%s' looks similar to keyword '%s'.\n", yytext, kw);
+            /* Filter out false positives:
+             * - Short identifiers (1-3 chars) matching longer keywords
+             * - Single character identifiers (likely class/method names)
+             * - Identifiers that look like they might be in an OOP context
+             */
+            if (!is_likely_false_positive_hint(yytext, kw)) {
+                fprintf(stderr, "Hint: '%s' looks similar to keyword '%s'.\n", yytext, kw);
+            }
         }
     }
 

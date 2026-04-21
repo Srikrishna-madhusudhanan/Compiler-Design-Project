@@ -1,0 +1,27 @@
+=====================================================
+GUI API TEST RESULTS
+=====================================================
+
+COMPILE & VIZ TESTS
+=====================================================
+Testing Compile & Viz: Simple Addition (O0) (O0)
+  ✗ FAILED: No response from server (timeout)
+
+Testing Compile & Viz: Simple Addition (O1) (O1)
+  ✗ FAILED: No response from server (timeout)
+
+Testing Compile & Viz: Recursive Factorial (O2) (O2)
+  ✗ FAILED: No response from server (timeout)
+
+Testing Compile & Viz: Diagnostic: Missing Semicolon (O0)
+  ✗ FAILED: No response from server (timeout)
+
+Testing Compile & Viz: Diagnostic: Printf Typo (O0)
+  ✗ FAILED: No response from server (timeout)
+
+Testing Compile & Viz: OOP: Access Modifiers (should show false hint) (O0)
+  ✗ FAILED: No response from server (timeout)
+
+=====================================================
+UI API TESTING COMPLETE
+=====================================================
