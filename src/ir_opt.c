@@ -1930,7 +1930,7 @@ static int is_loop_invariant(IRInstr *instr, int *loop_blocks, int n, CFG *cfg) 
     return 1;
 }
 
-void optimize_loops(CFG *cfg) {
+void optimize_loops(CFG *cfg, int *loop_count) {
     if (!cfg) return;
     compute_dominators(cfg);
 
@@ -1939,6 +1939,7 @@ void optimize_loops(CFG *cfg) {
         for (int i = 0; i < b->succ_count; i++) {
             BasicBlock *h = b->succs[i];
             if (b->doms[h->id]) {
+                (*loop_count)++;
                 int *loop_blocks = calloc(cfg->block_count, sizeof(int));
                 loop_blocks[h->id] = 1;
 
@@ -2819,7 +2820,7 @@ static void induction_variable_elimination(CFG *cfg) {
     }
 }
 
-void unroll_loops(CFG *cfg) {
+void unroll_loops(CFG *cfg, int *loop_count) {
 
     if (!cfg) return;
     compute_dominators(cfg);
@@ -3116,11 +3117,13 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
             merge_trivial_blocks(cfg);
             mark_reachable_and_cleanup(cfg);
 
+            int loop_count = 0;
             if (level >= OPT_O2) {
-                optimize_loops(cfg);
-                unroll_loops(cfg);
+                optimize_loops(cfg, &loop_count);
+                unroll_loops(cfg, &loop_count);
 
             }
+            if (metrics) metrics->loops_found += loop_count;
 
             f->instrs = flatten_cfg(cfg);
             free_cfg(cfg);

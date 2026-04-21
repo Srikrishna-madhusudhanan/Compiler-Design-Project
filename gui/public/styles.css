@@ -136,9 +136,39 @@ body.has-maximized .resizer-v {
     letter-spacing: 0.05em;
     color: var(--text-secondary);
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 10px;
     flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.func-selector {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.func-tab {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.func-tab:hover {
+    background-color: rgba(56, 189, 248, 0.1);
+    border-color: var(--accent-color);
+}
+
+.func-tab.active {
+    background-color: var(--accent-color);
+    color: var(--bg-color);
+    border-color: var(--accent-color);
 }
 
 .panel-content {

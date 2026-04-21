@@ -18,6 +18,7 @@ let astNetwork = null;
 let raNetwork = null;
 let currentAstData = null;
 let currentRaData = null;
+let allRaData = null;
 let currentCfgData = null;
 let metricsChart = null;
 
@@ -394,6 +395,49 @@ function renderRegisterUsage(data) {
     });
 }
 
+// Function selection for RA
+function buildFunctionTabs() {
+    const container = document.querySelector('.func-selector');
+    if (!container || !allRaData) return;
+    
+    // Clear existing tabs
+    const existingTabs = container.querySelectorAll('.func-tab');
+    existingTabs.forEach(tab => tab.remove());
+    
+    allRaData.forEach(func => {
+        const tab = document.createElement('button');
+        tab.className = 'func-tab';
+        tab.textContent = func.func_name;
+        tab.addEventListener('click', () => selectRaFunction(func.func_name));
+        container.appendChild(tab);
+    });
+    
+    // Select first by default
+    if (allRaData.length > 0) {
+        selectRaFunction(allRaData[0].func_name);
+    }
+}
+
+function selectRaFunction(funcName) {
+    const funcData = allRaData.find(d => d.func_name === funcName);
+    if (!funcData) return;
+    
+    currentRaData = funcData;
+    renderRegisterUsage(currentRaData);
+    
+    // Update active tab
+    const tabs = document.querySelectorAll('.func-tab');
+    tabs.forEach(tab => {
+        if (tab.textContent === funcName) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+    
+    log(`Switched to function: ${funcName}`, 'info');
+}
+
 // CFG Rendering
 async function renderCFG(data) {
     if (!data || !data.blocks || data.blocks.length === 0) return;
@@ -458,7 +502,9 @@ compileBtn.addEventListener('click', async () => {
             updateDashboard(metrics);
             
             currentAstData = data.ast_json;
-            currentRaData = data.ra_json.find(d => d.func_name === 'main') || data.ra_json[0]; // Take main or first function
+            allRaData = data.ra_json;
+            buildFunctionTabs();
+            selectRaFunction('main');  // Try to select main, fallback to current
             currentCfgData = data.cfg_json.find(d => d.func_name === 'main') || data.cfg_json[0];
             
             // Static viz
@@ -522,6 +568,10 @@ function parseMetrics(text) {
                 } else if (valStr.toLowerCase().includes('unknown')) {
                     metrics.mem = 'Unknown';
                 }
+            }
+            if (label.toLowerCase().includes('dynamic instructions')) {
+                const dynMatch = valStr.match(/([\d\.,]+)/);
+                if (dynMatch) metrics.dynamicInstructions = parseInt(dynMatch[1].replace(/,/g, ''));
             }
         }
     });
@@ -630,7 +680,7 @@ runBtn.addEventListener('click', async () => {
         const metrics = parseMetrics(data.metrics);
         if (metrics.time !== undefined) {
             updateDashboard(metrics);
-            log(`✅ Exec time: ${metrics.time} ms | Peak memory: ${metrics.mem} KB`, 'success');
+            log(`✅ Exec time: ${metrics.time} ms | Peak memory: ${metrics.mem} KB | Dynamic instructions: ${metrics.dynamicInstructions || 0}`, 'success');
         } else {
             log('⚠️ Metrics not available — did you compile first?', 'warning');
         }
