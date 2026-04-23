@@ -11,6 +11,35 @@ Source Code → Lexer → Parser → Semantic Analysis → IR → IR Optimizatio
 
 ---
 
+## Project Directory Structure
+
+```text
+.
+├── Makefile              # Build rules for compiler and custom toolchain
+├── src/                  # Compiler source code (Lexer, Parser, AST, IR, Semantic, RISC-V Codegen)
+│   ├── minilib.c         # Custom minimal C runtime
+│   ├── exception_runtime.s # Exception handling assembly runtime
+│   └── io_runtime.s      # Base I/O assembly runtime
+├── tools/                # Custom RISC-V Toolchain
+│   ├── rvas/             # Custom RISC-V Assembler
+│   └── rvld/             # Custom RISC-V Static Linker
+├── test/                 # C-subset test suite
+│   ├── basics/           # Basic arithmetic and control flow
+│   ├── complex/          # Advanced algorithms (fibonacci, bst, factorial)
+│   ├── features/         # Language specific features (switch, loops)
+│   ├── oop/              # Object-oriented programming features
+│   └── optimizations/    # Tests specifically for loop unrolling, etc.
+├── scripts/              # Helper shell scripts
+│   ├── run_tests.sh      # Compiles all tests and checks for success
+│   ├── run_qemu_tests.sh # Compiles and runs test suite in QEMU simulator
+│   ├── rv_run.sh         # Executes the complete custom toolchain pipeline
+│   └── cleanup.sh        # Cleans up generated visualization artifacts
+├── gui/                  # Interactive visualization web dashboard
+└── docs/                 # Project documentation and reports
+```
+
+---
+
 ## Prerequisites
 
 Install the standard build tools, QEMU for RISC-V simulation, and the RISC-V GCC cross-compiler (used to compile the minimal C runtime library).
