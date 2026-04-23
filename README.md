@@ -51,6 +51,12 @@ sudo apt install build-essential qemu-user qemu-user-static gcc-riscv64-linux-gn
 ```
 *(Node.js and npm are also required if you plan to use the interactive Web GUI.)*
 
+```bash
+# On Ubuntu/Debian
+sudo apt update
+sudo apt install nodejs npm
+```
+
 ---
 
 ## Quick Start

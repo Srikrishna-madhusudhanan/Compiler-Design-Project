@@ -9,7 +9,8 @@ struct CompilerMetrics;
 typedef enum {
     OPT_O0,
     OPT_O1,
-    OPT_O2
+    OPT_O2,
+    OPT_O3 //for testing only
 } OptLevel;
 
 /* Basic Block structure */

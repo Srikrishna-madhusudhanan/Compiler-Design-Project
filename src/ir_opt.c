@@ -3121,7 +3121,9 @@ void optimize_program(IRProgram *prog, OptLevel level, CompilerMetrics *metrics)
             if (level >= OPT_O2) {
                 optimize_loops(cfg, &loop_count);
                 unroll_loops(cfg, &loop_count);
-
+                if (level >= OPT_O3) {
+                    induction_variable_elimination(cfg);
+                }
             }
             if (metrics) metrics->loops_found += loop_count;
 
