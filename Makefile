@@ -22,7 +22,7 @@ OBJS = $(BUILD_DIR)/y.tab.o \
        $(BUILD_DIR)/riscv_gen.o
 #        $(BUILD_DIR)/ir_opt.o
 
-all: setup parser
+all: setup toolchain parser
 
 rvas:
 	$(MAKE) -C tools/rvas

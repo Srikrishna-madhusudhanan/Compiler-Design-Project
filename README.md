@@ -5,9 +5,22 @@ A full compiler pipeline from a C-subset language to RISC-V assembly, with a pre
 ## Pipeline Overview
 
 ```
-Source Code → Lexer → Parser → Semantic Analysis → IR → Optimization
-           → Instruction Scheduling → Register Allocation → RISC-V Codegen
+Source Code → Lexer → Parser → Semantic Analysis → IR → IR Optimization
+           → Instruction Scheduling → Register Allocation → RISC-V Codegen-> Assembler -> Linker -> ELF file (final executable)
 ```
+
+---
+
+## Prerequisites
+
+Install the standard build tools, QEMU for RISC-V simulation, and the RISC-V GCC cross-compiler (used to compile the minimal C runtime library).
+
+```bash
+# On Ubuntu/Debian
+sudo apt update
+sudo apt install build-essential qemu-user qemu-user-static gcc-riscv64-linux-gnu time
+```
+*(Node.js and npm are also required if you plan to use the interactive Web GUI.)*
 
 ---
 
@@ -15,28 +28,44 @@ Source Code → Lexer → Parser → Semantic Analysis → IR → Optimization
 
 ### 1. Build the Compiler
 ```bash
-make clean && make
+make clean && make all
 ```
 
-### 2. Compile a Program
+### 2. Compile a Program and View Output In Terminal
 ```bash
-./build/parser < test/basics/minimal_main.c
+./build/parser < test/oop/polymorphism_demo.c
+# Optional flags:
+# --metrics   → save timing/memory to compiler_metrics.txt
+# -O0/-O1/-O2 → optimization level
 ```
+You can view the pre-optimized IR code in `ir.txt` and optimized IR code in `ir_opt.txt`.
 
-### 3. Run All Tests
-```bash
-./run_tests.sh
-# or with QEMU:
-./scripts/run_qemu_tests.sh
-```
+You can view the assembly (RISC-V) code in the `output.s` file.
 
-### 4. Compile & Run a Single File with QEMU
+### 3. Compile & Run a Single File with QEMU 
+The command below will:
+1. Compile a test program from source code to RISC-V
+2. Assemble it into object file (.o)
+3. Link it, and run the ELF executable in QEMU (a RISC-V Simulator).
 ```bash
-./scripts/qemu_run.sh test/complex/factorial_tail_recursive.c "7\n"
+./scripts/rv_run.sh test/complex/factorial_tail_recursive.c
 # Optional flags:
 #   --metrics   → save timing/memory to compiler_metrics.txt
 #   -O0/-O1/-O2 → optimization level
 ```
+
+### 4. To Run All Tests
+```bash
+./scripts/run_tests.sh #checks if compilation succeeds
+# or with QEMU:
+./scripts/run_qemu_tests.sh #checks if compilation and execution succeeds
+```
+
+### 5. To Cleanup The Generated .dot and .json files (which were created for GUI visualization):
+```bash
+./scripts/cleanup.sh
+```
+
 
 ---
 
@@ -76,7 +105,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 - The compiler runs, the **Terminal Output** panel shows live progress, and the following are populated automatically:
   - **Intermediate Representation** panel (left)
   - **Control Flow Graph** (center)
-  - **Performance Metrics** dashboard with pre/post-opt IR counts
+  - **Performance Metrics** dashboard
   - **Register Usage Map** (right panel, bottom)
 
 ---
@@ -129,23 +158,34 @@ Located in the **right pane**, middle panel (scroll down).
 
 ## 🔧 RISC-V Toolchain (rvas + rvld)
 
-PaniniC includes a custom assembler and static linker.
+PaniniC includes a custom RISC-V assembler (`rvas`) and static linker (`rvld`). The toolchain connects the compiled assembly with `minilib.c`, a custom minimal runtime environment.
 
+The steps below are performed by `scripts/rv_run.sh` altogether, but we have listed it below for testing the assembler and linker process step by step.
+
+Before executing the steps below, ensure you have the compiled output (in `output.s` file).
 ```bash
-# Build both tools
-make toolchain
+# Ensure the tools are built
+make -C tools/rvas
+make -C tools/rvld
 
-# Assemble
-./tools/rvas/rvas -o program.o program.s
+# Assemble the runtime and the program (assuming program is compiled to output.s)
+mkdir -p build/obj
+./tools/rvas/rvas src/io_runtime.s -o build/obj/io_runtime.o
+./tools/rvas/rvas src/exception_runtime.s -o build/obj/exception_runtime.o
+./tools/rvas/rvas output.s -o build/obj/output.o
 
-# Link
-./tools/rvld/rvld -o program program.o tools/rvld/tests/crt0.o
+# Compile the minimal C runtime
+riscv64-linux-gnu-gcc -c src/minilib.c -o build/obj/minilib.o -ffreestanding -fno-builtin -nostdlib -O2
+
+# Link to create the final executable
+./tools/rvld/rvld -o build/program.elf \
+    build/obj/io_runtime.o \
+    build/obj/minilib.o \
+    build/obj/exception_runtime.o \
+    build/obj/output.o
 
 # Run via QEMU
-qemu-riscv64 ./program
-
-# Run linker test suite
-cd tools/rvld/tests && ./run_tests.sh
+qemu-riscv64 build/program.elf
 ```
 
 ---
